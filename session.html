@@ -40,6 +40,11 @@
             border: 2px solid var(--border-color);
             border-radius: 4px;
             color: var(--text-primary);
+            transition: border-color 0.3s;
+        }
+
+        .code-input.paste-success {
+            border-color: #4CAF50;
         }
 
         .session-btn {
@@ -196,6 +201,25 @@
                 document.body.classList.contains('dark-mode') ? '☀️' : '🌙';
         });
 
+        // Auto-paste functionality
+        function setupAutoPaste(input) {
+            async function handlePaste() {
+                try {
+                    const text = await navigator.clipboard.readText();
+                    input.value = text.trim();
+                    input.classList.add('paste-success');
+                    setTimeout(() => {
+                        input.classList.remove('paste-success');
+                    }, 1000);
+                } catch (err) {
+                    console.error('Failed to paste from clipboard:', err);
+                }
+            }
+
+            input.addEventListener('click', handlePaste);
+            input.addEventListener('focus', handlePaste);
+        }
+
         // Copy to clipboard functionality
         function setupCopyButton(codeDisplay) {
             const copyBtn = codeDisplay.querySelector('.copy-btn');
@@ -238,6 +262,10 @@
         // Setup copy buttons
         setupCopyButton(teacherCode);
         setupCopyButton(studentCode);
+
+        // Setup auto-paste for input fields
+        setupAutoPaste(teacherCodeInput);
+        setupAutoPaste(studentCodeInput);
 
         // Create new teacher session
         createTeacherSession.addEventListener('click', async () => {
