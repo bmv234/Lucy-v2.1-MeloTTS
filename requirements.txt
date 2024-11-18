@@ -1,0 +1,7 @@
+argostranslate==1.9.6
+Flask
+Flask-Cors
+numpy
+torch
+transformers
+git+https://github.com/myshell-ai/MeloTTS.git

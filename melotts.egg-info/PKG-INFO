@@ -1,0 +1,32 @@
+Metadata-Version: 2.1
+Name: melotts
+Version: 2.1.0
+Summary: A text-to-speech synthesis package
+Author: MeloTTS Team
+Requires-Python: >=3.7
+Requires-Dist: torch
+Requires-Dist: torchaudio
+Requires-Dist: numpy
+Requires-Dist: librosa
+Requires-Dist: soundfile
+Requires-Dist: tqdm
+Requires-Dist: click
+Requires-Dist: transformers
+Requires-Dist: cn2an
+Requires-Dist: pypinyin
+Requires-Dist: jieba
+Requires-Dist: inflect
+Requires-Dist: unidecode
+Requires-Dist: phonemizer
+Requires-Dist: ko_pron
+Requires-Dist: gruut[de,es,fr]
+Requires-Dist: eng_to_ipa
+Requires-Dist: pyopenjtalk
+Requires-Dist: mecab-python3
+Requires-Dist: unidic-lite
+Requires-Dist: pykakasi
+Requires-Dist: fugashi
+Requires-Dist: ipadic
+Requires-Dist: g2p_en
+Requires-Dist: jamo
+Requires-Dist: cached-path
