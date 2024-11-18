@@ -37,6 +37,32 @@ export const StatusMessage = {
     }
 };
 
+// Text highlighting utilities
+export const TextHighlighter = {
+    clearHighlights(elements) {
+        if (elements) {
+            elements.forEach(element => {
+                element.classList.remove('highlighted');
+            });
+        }
+    }
+};
+
+// Audio utilities
+export const AudioUtils = {
+    base64ToBlob(base64) {
+        const byteCharacters = atob(base64);
+        const byteNumbers = new Array(byteCharacters.length);
+        
+        for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        
+        const byteArray = new Uint8Array(byteNumbers);
+        return new Blob([byteArray], { type: 'audio/wav' });
+    }
+};
+
 // API endpoint prefix
 const API_PREFIX = '/api/v1';
 

@@ -115,7 +115,8 @@ class StudentApp {
                     // Update transcription if provided
                     if (event.data.transcription !== undefined) {
                         requestAnimationFrame(() => {
-                            this.transcriptionText.textContent = event.data.transcription;
+                            // Handle empty string case
+                            this.transcriptionText.textContent = event.data.transcription || '';
                             this.transcriptionText.scrollTop = this.transcriptionText.scrollHeight;
                         });
                     }
@@ -123,7 +124,8 @@ class StudentApp {
                     // Update translation if provided
                     if (event.data.text !== undefined) {
                         requestAnimationFrame(() => {
-                            this.incomingText.textContent = event.data.text;
+                            // Handle empty string case
+                            this.incomingText.textContent = event.data.text || '';
                             this.incomingText.scrollTop = this.incomingText.scrollHeight;
                             
                             // Only synthesize if there's new text
