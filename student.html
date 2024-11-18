@@ -30,6 +30,25 @@
         body.debug .container {
             padding-bottom: 220px;
         }
+        /* Session info styles */
+        .session-info {
+            background: var(--bg-secondary);
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .session-code {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: var(--text-primary);
+        }
+        .session-code span {
+            color: var(--primary-color);
+            margin-left: 0.5rem;
+        }
     </style>
 </head>
 <body class="dark-mode">
@@ -41,8 +60,14 @@
                     <span class="toggle-icon">☀️</span>
                 </button>
                 <button id="downloadButton" class="control-btn">Download Session</button>
-                <!-- Add debug toggle button -->
                 <button id="debugToggle" class="control-btn" style="font-size: 0.8em;">Debug</button>
+                <a href="/" class="switch-page-btn">Back to Session Page</a>
+            </div>
+        </div>
+
+        <div class="session-info">
+            <div class="session-code">
+                Student Code: <span id="studentCodeDisplay"></span>
             </div>
         </div>
 
@@ -93,6 +118,75 @@
         <div>Word Timings: <pre id="debugTimings"></pre></div>
     </div>
 
+    <script>
+        // API endpoint prefix
+        const API_PREFIX = '/api/v1';
+
+        // Get session code from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const studentCode = urlParams.get('code');
+        
+        // Redirect to session page if no code
+        if (!studentCode) {
+            window.location.href = '/';
+        }
+
+        // Display session code
+        document.getElementById('studentCodeDisplay').textContent = studentCode;
+        
+        // Validate session code and initialize content
+        async function validateSession() {
+            try {
+                const response = await fetch(`${API_PREFIX}/validate_student_session`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ student_code: studentCode })
+                });
+                const data = await response.json();
+                
+                if (!data.success || !data.data.valid) {
+                    window.location.href = '/';
+                    return;
+                }
+
+                // Store teacher code in window for broadcast channel
+                window.teacherCode = data.data.teacher_code;
+
+                // Initialize text content
+                const transcriptionText = document.getElementById('transcriptionText');
+                const incomingText = document.getElementById('incomingText');
+
+                if (data.data.transcription) {
+                    transcriptionText.textContent = data.data.transcription;
+                }
+                if (data.data.translation) {
+                    incomingText.textContent = data.data.translation;
+                }
+            } catch (error) {
+                console.error('Failed to validate session:', error);
+                window.location.href = '/';
+            }
+        }
+
+        // Validate session on load
+        validateSession();
+
+        // Debug panel toggle
+        const debugToggle = document.getElementById('debugToggle');
+        debugToggle.addEventListener('click', () => {
+            document.body.classList.toggle('debug');
+        });
+
+        // Dark mode toggle
+        const darkModeToggle = document.getElementById('darkModeToggle');
+        darkModeToggle.addEventListener('click', () => {
+            document.body.classList.toggle('dark-mode');
+            darkModeToggle.querySelector('.toggle-icon').textContent = 
+                document.body.classList.contains('dark-mode') ? '☀️' : '🌙';
+        });
+    </script>
     <script type="module" src="js/student/main.js"></script>
 </body>
 </html>

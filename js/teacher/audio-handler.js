@@ -1,187 +1,136 @@
-import { StatusMessage, API } from '../shared/utils.js';
+import { API } from '../shared/utils.js';
 
 export class AudioHandler {
     constructor(options) {
         this.onTranscriptionUpdate = options.onTranscriptionUpdate;
         this.onTranslationUpdate = options.onTranslationUpdate;
         this.onStatusChange = options.onStatusChange;
-        this.broadcastChannel = new BroadcastChannel('lucy-v4-channel');
+        this.teacherCode = options.teacherCode;
         
+        this.fromLanguage = 'en';
+        this.toLanguage = 'es';
+        this.isListening = false;
+        this.muted = false;
+        this.vad = null;
         this.audioContext = null;
-        this.microphone = null;
-        this.myvad = null;
-        this.vadInitialized = false;
-
-        // Map language codes to voice IDs
-        this.voiceMap = {
-            'en': 'EN',
-            'es': 'ES',
-            'fr': 'FR',
-            'zh': 'ZH',
-            'ja': 'JA'
-        };
+        this.audioStream = null;
     }
 
     async initVAD() {
-        if (this.vadInitialized) {
-            console.log('VAD already initialized');
-            return true;
-        }
-
         try {
-            console.log('Checking VAD dependencies...');
-            if (typeof vad === 'undefined') {
-                throw new Error('Silero VAD library not loaded');
-            }
-
-            // Create a temporary audio context to ensure worklet is loaded
-            const tempContext = new (window.AudioContext || window.webkitAudioContext)();
-            await tempContext.audioWorklet.addModule(window.WEBVAD_WORKER_PATH);
-            tempContext.close();
-
-            console.log('Creating VAD instance...');
-            this.myvad = await vad.MicVAD.new({
+            // Create VAD instance
+            this.vad = await window.vad.MicVAD.new({
                 onSpeechStart: () => {
-                    console.log('VAD: Speech started');
-                    this.onStatusChange('Listening...', 'info');
+                    console.log('Speech start detected');
+                    this.onStatusChange('Speech detected', 'info');
                 },
-                onSpeechEnd: (audio) => {
-                    console.log('VAD: Speech ended');
-                    this.onStatusChange('Processing...', 'info');
-                    this.processAudio(audio);
+                onSpeechEnd: async (audio) => {
+                    console.log('Speech end detected');
+                    this.onStatusChange('Processing speech...', 'info');
+                    await this.processAudio(audio);
                 },
                 onVADMisfire: () => {
-                    console.log('VAD: Misfire');
+                    console.log('VAD misfire');
                     this.onStatusChange('Ready', 'success');
                 }
             });
-
-            console.log('Silero VAD initialized successfully');
-            this.vadInitialized = true;
+            console.log('VAD initialized successfully');
             return true;
         } catch (error) {
-            console.error('Error initializing VAD:', error);
-            this.onStatusChange(`Error initializing voice detection: ${error.message}`, 'error');
+            console.error('Failed to initialize VAD:', error);
+            this.onStatusChange('Failed to initialize speech detection', 'error');
             return false;
         }
     }
 
-    async startListening(fromLanguage, toLanguage) {
-        console.log('Starting listening process...');
-        
+    async startListening() {
+        if (!this.vad) {
+            console.error('VAD not initialized');
+            this.onStatusChange('Speech detection not initialized', 'error');
+            return false;
+        }
+
         try {
-            // Initialize audio context if needed
-            if (!this.audioContext) {
-                this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                await this.audioContext.resume();
-                console.log('Audio context initialized');
-            }
-
-            // Request microphone permission
-            const stream = await navigator.mediaDevices.getUserMedia({ 
-                audio: {
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    autoGainControl: true
-                }
-            });
-
-            // Initialize VAD if needed
-            if (!this.vadInitialized) {
-                console.log('Initializing VAD...');
-                const success = await this.initVAD();
-                if (!success) {
-                    this.onStatusChange('Error initializing voice detection', 'error');
-                    return false;
-                }
-            }
-
-            // Start VAD
-            console.log('Starting VAD...');
-            await this.myvad.start();
-            console.log('Started listening');
-            this.onStatusChange('Ready', 'success');
+            // Request microphone permission and start VAD
+            await this.vad.start();
+            this.isListening = true;
+            this.onStatusChange('Listening...', 'success');
             return true;
         } catch (error) {
-            console.error('Error starting audio:', error);
-            this.onStatusChange(`Error starting voice detection: ${error.message}`, 'error');
+            console.error('Failed to start listening:', error);
+            this.onStatusChange('Failed to start listening', 'error');
             return false;
         }
     }
 
     async stopListening() {
-        if (this.myvad) {
-            this.myvad.pause();
-            console.log('Stopped listening');
-            this.onStatusChange('Stopped', 'info');
-            return true;
+        if (!this.vad) {
+            console.error('VAD not initialized');
+            return false;
         }
-        return false;
+
+        try {
+            // Stop VAD and clean up
+            await this.vad.pause();
+            this.isListening = false;
+            this.onStatusChange('Stopped listening', 'info');
+            return true;
+        } catch (error) {
+            console.error('Failed to stop listening:', error);
+            this.onStatusChange('Failed to stop listening', 'error');
+            return false;
+        }
     }
 
     async processAudio(audio) {
-        console.log('Converting audio data...');
-        const audioData = new Int16Array(audio.map(x => Math.max(-32768, Math.min(32767, Math.round(x * 32767)))));
-        console.log('Audio data converted, samples:', audioData.length);
-
-        // Convert audio data to base64
-        const base64Audio = btoa(String.fromCharCode(...new Uint8Array(audioData.buffer)));
-        
         try {
-            // Get the correct voice ID for the target language
-            const voiceId = this.voiceMap[this.toLanguage];
-            if (!voiceId) {
-                throw new Error(`No voice mapping found for language: ${this.toLanguage}`);
-            }
-
-            console.log(`Processing audio: from ${this.fromLanguage} to ${this.toLanguage} using voice ${voiceId}`);
-
+            // Convert audio to base64
+            const audioData = this.float32ArrayToBase64(audio);
+            
+            // Process audio through API
             const response = await API.processAudio(
-                base64Audio,
+                audioData,
                 this.fromLanguage,
                 this.toLanguage,
-                voiceId
+                this.teacherCode
             );
-
+            
             if (response.success) {
-                this.displayResults(response.data);
+                // Update transcription and translation
+                if (response.data.transcription) {
+                    this.onTranscriptionUpdate(response.data.transcription);
+                }
+                if (response.data.translation) {
+                    this.onTranslationUpdate(response.data.translation);
+                }
+                this.onStatusChange('Ready', 'success');
             } else {
                 throw new Error(response.error || 'Failed to process audio');
             }
         } catch (error) {
-            console.error('Error sending audio data:', error);
-            this.onStatusChange('Error processing audio', 'error');
+            console.error('Error processing audio:', error);
+            this.onStatusChange('Error processing speech', 'error');
         }
-    }
-
-    displayResults(data) {
-        console.log('Displaying results:', data);
-        
-        if (data.transcription) {
-            this.onTranscriptionUpdate(data.transcription);
-        }
-        
-        if (data.translation) {
-            this.onTranslationUpdate(data.translation);
-            this.broadcastResults(data.transcription, data.translation);
-        }
-        
-        this.onStatusChange('Ready', 'success');
-    }
-
-    broadcastResults(transcription, translation) {
-        this.broadcastChannel.postMessage({
-            type: 'translation',
-            transcription: transcription,
-            text: translation,
-            fromLang: this.fromLanguage,
-            toLang: this.toLanguage
-        });
     }
 
     setLanguages(fromLang, toLang) {
-        console.log(`Setting languages: ${fromLang} -> ${toLang}`);
         this.fromLanguage = fromLang;
         this.toLanguage = toLang;
+    }
+
+    float32ArrayToBase64(float32Array) {
+        // Convert Float32Array to Int16Array
+        const int16Array = new Int16Array(float32Array.length);
+        for (let i = 0; i < float32Array.length; i++) {
+            const s = Math.max(-1, Math.min(1, float32Array[i]));
+            int16Array[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+        }
+        
+        // Convert Int16Array to Base64
+        const buffer = new ArrayBuffer(int16Array.length * 2);
+        new Int16Array(buffer).set(int16Array);
+        const binary = new Uint8Array(buffer);
+        const bytes = Array.from(binary).map(byte => String.fromCharCode(byte)).join('');
+        return btoa(bytes);
     }
 }

@@ -2,10 +2,13 @@ import { DarkMode, StatusMessage, API } from '../shared/utils.js';
 import { AudioHandler } from './audio-handler.js';
 
 class TeacherApp {
-    constructor() {
+    constructor(teacherCode) {
+        this.teacherCode = teacherCode;
+        console.log('Initializing TeacherApp with code:', teacherCode);
         this.initElements();
         this.initAudioHandler();
         this.setupEventListeners();
+        this.setupBroadcastChannel();
         this.initialize();
     }
 
@@ -38,6 +41,24 @@ class TeacherApp {
         this.languagePairs = {};
     }
 
+    setupBroadcastChannel() {
+        console.log('Setting up broadcast channel');
+        this.broadcastChannel = new BroadcastChannel('lucy-v4-channel');
+    }
+
+    broadcastUpdate() {
+        // Send full content to student
+        console.log('Broadcasting update');
+        const message = {
+            type: 'translation',
+            transcription: this.transcriptionText.value,
+            text: this.translationText.value,
+            teacherCode: this.teacherCode
+        };
+        console.log('Broadcast message:', message);
+        this.broadcastChannel.postMessage(message);
+    }
+
     downloadSession() {
         const transcription = this.transcriptionText.value.trim();
         const translation = this.translationText.value.trim();
@@ -48,7 +69,6 @@ class TeacherApp {
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         
-        // Create timestamp in local timezone with simpler format
         const now = new Date();
         const timestamp = now.toLocaleString('en-US', {
             year: 'numeric',
@@ -72,22 +92,25 @@ class TeacherApp {
     initAudioHandler() {
         this.audioHandler = new AudioHandler({
             onTranscriptionUpdate: (text) => {
-                this.transcriptionText.value += `${text} `;
-                this.transcriptionText.scrollTop = this.transcriptionText.scrollHeight;
-                // Store in localStorage for student page without newlines
-                const storedTranscription = localStorage.getItem('transcriptionText') || '';
-                localStorage.setItem('transcriptionText', storedTranscription + text + ' ');
+                requestAnimationFrame(() => {
+                    this.transcriptionText.value += `${text} `;
+                    this.transcriptionText.scrollTop = this.transcriptionText.scrollHeight;
+                    // Broadcast full content update
+                    this.broadcastUpdate();
+                });
             },
             onTranslationUpdate: (text) => {
-                this.translationText.value += `${text} `;
-                this.translationText.scrollTop = this.translationText.scrollHeight;
-                // Store in localStorage for student page without newlines
-                const storedTranslation = localStorage.getItem('incomingText') || '';
-                localStorage.setItem('incomingText', storedTranslation + text + ' ');
+                requestAnimationFrame(() => {
+                    this.translationText.value += `${text} `;
+                    this.translationText.scrollTop = this.translationText.scrollHeight;
+                    // Broadcast full content update
+                    this.broadcastUpdate();
+                });
             },
             onStatusChange: (message, type) => {
                 StatusMessage.show(message, type, this.statusDiv);
-            }
+            },
+            teacherCode: this.teacherCode  // Pass teacher code to AudioHandler
         });
     }
 
@@ -107,6 +130,12 @@ class TeacherApp {
         
         // Dark mode
         DarkMode.init(this.darkModeToggle);
+
+        // Monitor text changes
+        ['input', 'change'].forEach(event => {
+            this.transcriptionText.addEventListener(event, () => this.broadcastUpdate());
+            this.translationText.addEventListener(event, () => this.broadcastUpdate());
+        });
     }
 
     async initialize() {
@@ -197,16 +226,76 @@ class TeacherApp {
         }
     }
 
-    clearResults() {
+    async clearResults() {
         this.transcriptionText.value = '';
         this.translationText.value = '';
-        // Clear localStorage as well
-        localStorage.setItem('transcriptionText', '');
-        localStorage.setItem('incomingText', '');
+        
+        // Clear session data in database
+        try {
+            const response = await fetch('/api/v1/clear_session', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ teacher_code: this.teacherCode })
+            });
+            const data = await response.json();
+            if (!data.success) {
+                throw new Error(data.error || 'Failed to clear session data');
+            }
+            // Broadcast clear event
+            this.broadcastUpdate();
+        } catch (error) {
+            console.error('Error clearing session:', error);
+            StatusMessage.show('Error clearing session data', 'error', this.statusDiv);
+        }
     }
 }
 
 // Initialize the application when the page loads
-window.addEventListener('load', () => {
-    new TeacherApp();
+window.addEventListener('load', async () => {
+    // Get teacher code from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const teacherCode = urlParams.get('code');
+    
+    // Redirect to session page if no code
+    if (!teacherCode) {
+        window.location.href = '/';
+    }
+
+    // Display teacher code
+    document.getElementById('teacherCodeDisplay').textContent = teacherCode;
+    
+    // Validate session code
+    try {
+        const response = await fetch('/api/v1/validate_teacher_session', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ teacher_code: teacherCode })
+        });
+        const data = await response.json();
+        
+        if (!data.success || !data.data.valid) {
+            window.location.href = '/';
+        } else {
+            // Display student code
+            document.getElementById('studentCodeDisplay').textContent = data.data.student_code;
+            
+            // Initialize app with teacher code and session data
+            const app = new TeacherApp(teacherCode);
+            if (data.data.transcription) {
+                app.transcriptionText.value = data.data.transcription;
+            }
+            if (data.data.translation) {
+                app.translationText.value = data.data.translation;
+            }
+            // Broadcast initial content
+            app.broadcastUpdate();
+        }
+    } catch (error) {
+        console.error('Failed to validate session:', error);
+        window.location.href = '/';
+    }
 });

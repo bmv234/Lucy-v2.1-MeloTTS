@@ -2,13 +2,15 @@ import { DarkMode, API } from '../shared/utils.js';
 import { AudioPlayer } from './audio-player.js';
 
 class StudentApp {
-    constructor() {
+    constructor(studentCode, teacherCode) {
+        this.studentCode = studentCode;
+        this.teacherCode = teacherCode;
+        console.log('Initializing StudentApp with teacher code:', teacherCode);
         this.initElements();
         this.initAudioPlayer();
         this.setupEventListeners();
         this.setupBroadcastChannel();
         this.pendingAudio = null;
-        this.loadStoredContent();
     }
 
     initElements() {
@@ -24,24 +26,6 @@ class StudentApp {
 
         // Initialize dark mode
         DarkMode.init(this.darkModeToggle);
-    }
-
-    loadStoredContent() {
-        // Load stored content from localStorage
-        const storedTranscription = localStorage.getItem('transcriptionText');
-        const storedTranslation = localStorage.getItem('incomingText');
-
-        if (storedTranscription) {
-            this.transcriptionText.textContent = storedTranscription;
-        }
-        if (storedTranslation) {
-            this.incomingText.textContent = storedTranslation;
-        }
-    }
-
-    saveContent() {
-        localStorage.setItem('transcriptionText', this.transcriptionText.textContent);
-        localStorage.setItem('incomingText', this.incomingText.textContent);
     }
 
     downloadSession() {
@@ -116,48 +100,39 @@ class StudentApp {
         });
 
         this.downloadButton.addEventListener('click', () => this.downloadSession());
-
-        const observeTextBox = (element) => {
-            const observer = new MutationObserver((mutations) => {
-                mutations.forEach((mutation) => {
-                    if (mutation.type === 'childList') {
-                        element.scrollTop = element.scrollHeight;
-                    }
-                });
-            });
-
-            observer.observe(element, {
-                childList: true,
-                subtree: true
-            });
-        };
-
-        observeTextBox(this.transcriptionText);
-        observeTextBox(this.incomingText);
     }
 
     setupBroadcastChannel() {
+        console.log('Setting up broadcast channel with teacher code:', this.teacherCode);
         this.broadcastChannel = new BroadcastChannel('lucy-v4-channel');
         this.broadcastChannel.onmessage = (event) => {
-            if (event.data.type === 'translation') {
-                const transcription = event.data.transcription || '';
-                const translation = event.data.text || '';
-                
-                if (transcription) {
-                    this.transcriptionText.textContent += transcription + ' ';
-                }
-                
-                if (translation) {
-                    // Store the plain text
-                    const currentText = this.incomingText.textContent;
-                    const newText = currentText ? currentText + ' ' + translation : translation;
-                    this.incomingText.textContent = newText;
+            console.log('Received broadcast message:', event.data);
+            
+            // Only process messages from our teacher's session
+            if (event.data.teacherCode === this.teacherCode) {
+                console.log('Processing message from teacher');
+                if (event.data.type === 'translation') {
+                    // Update transcription if provided
+                    if (event.data.transcription !== undefined) {
+                        requestAnimationFrame(() => {
+                            this.transcriptionText.textContent = event.data.transcription;
+                            this.transcriptionText.scrollTop = this.transcriptionText.scrollHeight;
+                        });
+                    }
                     
-                    // Synthesize and play the new text
-                    this.synthesizeAndPlay(translation, true);
+                    // Update translation if provided
+                    if (event.data.text !== undefined) {
+                        requestAnimationFrame(() => {
+                            this.incomingText.textContent = event.data.text;
+                            this.incomingText.scrollTop = this.incomingText.scrollHeight;
+                            
+                            // Only synthesize if there's new text
+                            if (event.data.text.trim()) {
+                                this.synthesizeAndPlay(event.data.text, true);
+                            }
+                        });
+                    }
                 }
-                
-                this.saveContent();
             }
         };
     }
@@ -231,6 +206,48 @@ class StudentApp {
     }
 }
 
-window.addEventListener('load', () => {
-    new StudentApp();
+// Initialize the application when the page loads
+window.addEventListener('load', async () => {
+    // Get student code from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const studentCode = urlParams.get('code');
+    
+    // Redirect to session page if no code
+    if (!studentCode) {
+        window.location.href = '/';
+    }
+
+    // Display student code
+    document.getElementById('studentCodeDisplay').textContent = studentCode;
+    
+    // Validate session and initialize app
+    try {
+        const response = await fetch('/api/v1/validate_student_session', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ student_code: studentCode })
+        });
+        const data = await response.json();
+        
+        if (!data.success || !data.data.valid) {
+            window.location.href = '/';
+        } else {
+            console.log('Session validated, teacher code:', data.data.teacher_code);
+            // Initialize app with student code and teacher code
+            const app = new StudentApp(studentCode, data.data.teacher_code);
+            
+            // Set initial content
+            if (data.data.transcription) {
+                app.transcriptionText.textContent = data.data.transcription;
+            }
+            if (data.data.translation) {
+                app.incomingText.textContent = data.data.translation;
+            }
+        }
+    } catch (error) {
+        console.error('Failed to validate session:', error);
+        window.location.href = '/';
+    }
 });

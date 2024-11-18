@@ -32,6 +32,28 @@
         window.addEventListener('load', loadVADWorklet);
     </script>
     <link rel="stylesheet" href="styles.css">
+    <style>
+        .session-info {
+            background: var(--bg-secondary);
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .session-code {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: var(--text-primary);
+        }
+
+        .session-code span {
+            color: var(--primary-color);
+            margin-left: 0.5rem;
+        }
+    </style>
 </head>
 <body class="dark-mode">
     <div class="container">
@@ -42,7 +64,16 @@
                     <span class="toggle-icon">☀️</span>
                 </button>
                 <button id="downloadButton" class="control-btn">Download Session</button>
-                <a href="student.html" class="switch-page-btn" target="_blank">Switch to Student View</a>
+                <a href="/" class="switch-page-btn">Back to Session Page</a>
+            </div>
+        </div>
+
+        <div class="session-info">
+            <div class="session-code">
+                Teacher Code: <span id="teacherCodeDisplay"></span>
+            </div>
+            <div class="session-code">
+                Student Code: <span id="studentCodeDisplay"></span>
             </div>
         </div>
 
@@ -80,6 +111,50 @@
             </div>
         </div>
     </div>
+
+    <script>
+        // API endpoint prefix
+        const API_PREFIX = '/api/v1';
+
+        // Get session code from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const teacherCode = urlParams.get('code');
+        
+        // Redirect to session page if no code
+        if (!teacherCode) {
+            window.location.href = '/';
+        }
+
+        // Display session codes
+        document.getElementById('teacherCodeDisplay').textContent = teacherCode;
+        
+        // Validate session code
+        async function validateSession() {
+            try {
+                const response = await fetch(`${API_PREFIX}/validate_teacher_session`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ teacher_code: teacherCode })
+                });
+                const data = await response.json();
+                
+                if (!data.success || !data.data.valid) {
+                    window.location.href = '/';
+                } else {
+                    // Get student code
+                    document.getElementById('studentCodeDisplay').textContent = data.data.student_code;
+                }
+            } catch (error) {
+                console.error('Failed to validate session:', error);
+                window.location.href = '/';
+            }
+        }
+
+        // Validate session on load
+        validateSession();
+    </script>
     <script type="module" src="js/teacher/main.js"></script>
 </body>
 </html>

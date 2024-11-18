@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lucy v4 - Session Management</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .session-container {
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+            max-width: 600px;
+            margin: 2rem auto;
+            padding: 2rem;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .session-box {
+            padding: 1.5rem;
+            background: var(--bg-primary);
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .session-box h2 {
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+        }
+
+        .code-input {
+            width: 200px;
+            padding: 0.5rem;
+            font-size: 1.2rem;
+            text-align: center;
+            margin: 1rem 0;
+            background: var(--bg-secondary);
+            border: 2px solid var(--border-color);
+            border-radius: 4px;
+            color: var(--text-primary);
+        }
+
+        .session-btn {
+            padding: 0.8rem 1.5rem;
+            font-size: 1rem;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .session-btn:hover {
+            background: var(--primary-color-hover);
+        }
+
+        .code-display {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin: 1rem 0;
+            padding: 1rem;
+            background: var(--bg-secondary);
+            border-radius: 4px;
+            display: none;
+            position: relative;
+        }
+
+        .code-display .copy-btn {
+            position: absolute;
+            right: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 0.5rem;
+            font-size: 1.2rem;
+            transition: color 0.3s;
+        }
+
+        .code-display .copy-btn svg {
+            width: 20px;
+            height: 20px;
+            fill: currentColor;
+        }
+
+        .code-display .copy-btn:hover {
+            color: var(--primary-color);
+        }
+
+        .code-display .copy-btn.copied {
+            color: #4CAF50;
+        }
+
+        .error-message {
+            color: #ff6b6b;
+            background: rgba(255, 107, 107, 0.1);
+            border: 1px solid #ff6b6b;
+            padding: 0.5rem;
+            margin-top: 0.5rem;
+            border-radius: 4px;
+            display: none;
+        }
+
+        /* Dark mode specific styles */
+        .dark-mode .error-message {
+            color: #ffa4a4;
+            background: rgba(255, 164, 164, 0.1);
+            border-color: #ffa4a4;
+        }
+
+        /* Tooltip styles */
+        .tooltip {
+            position: absolute;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            padding: 0.5rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            top: -30px;
+            right: 0;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+        }
+
+        .tooltip.show {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="dark-mode">
+    <div class="container">
+        <div class="controls-top">
+            <h1>Lucy v4 - Session Management</h1>
+            <div class="top-controls">
+                <button id="darkModeToggle" class="toggle-btn">
+                    <span class="toggle-icon">☀️</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="session-container">
+            <div class="session-box">
+                <h2>Teacher Session</h2>
+                <button id="createTeacherSession" class="session-btn">Create New Session</button>
+                <div id="teacherCode" class="code-display">
+                    <span class="code-text"></span>
+                    <button class="copy-btn" title="Copy to clipboard">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                            <path d="M16 1H4C2.9 1 2 1.9 2 3v14h2V3h12V1zm3 4H8C6.9 5 6 5.9 6 7v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                        </svg>
+                    </button>
+                    <div class="tooltip">Copied!</div>
+                </div>
+                <div id="studentCode" class="code-display">
+                    <span class="code-text"></span>
+                    <button class="copy-btn" title="Copy to clipboard">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                            <path d="M16 1H4C2.9 1 2 1.9 2 3v14h2V3h12V1zm3 4H8C6.9 5 6 5.9 6 7v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                        </svg>
+                    </button>
+                    <div class="tooltip">Copied!</div>
+                </div>
+                <div>
+                    <input type="text" id="teacherCodeInput" class="code-input" placeholder="Enter Teacher Code">
+                    <button id="joinTeacherSession" class="session-btn">Join Session</button>
+                </div>
+                <div id="teacherError" class="error-message"></div>
+            </div>
+
+            <div class="session-box">
+                <h2>Student Session</h2>
+                <div>
+                    <input type="text" id="studentCodeInput" class="code-input" placeholder="Enter Student Code">
+                    <button id="joinStudentSession" class="session-btn">Join Session</button>
+                </div>
+                <div id="studentError" class="error-message"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // API endpoint prefix
+        const API_PREFIX = '/api/v1';
+
+        // Dark mode toggle functionality
+        const darkModeToggle = document.getElementById('darkModeToggle');
+        darkModeToggle.addEventListener('click', () => {
+            document.body.classList.toggle('dark-mode');
+            darkModeToggle.querySelector('.toggle-icon').textContent = 
+                document.body.classList.contains('dark-mode') ? '☀️' : '🌙';
+        });
+
+        // Copy to clipboard functionality
+        function setupCopyButton(codeDisplay) {
+            const copyBtn = codeDisplay.querySelector('.copy-btn');
+            const tooltip = codeDisplay.querySelector('.tooltip');
+            const codeText = codeDisplay.querySelector('.code-text');
+
+            copyBtn.addEventListener('click', async () => {
+                // Get the code text without the label
+                const code = codeText.textContent.split(': ')[1];
+                
+                try {
+                    await navigator.clipboard.writeText(code);
+                    
+                    // Show tooltip
+                    tooltip.classList.add('show');
+                    copyBtn.classList.add('copied');
+                    
+                    // Hide tooltip after 2 seconds
+                    setTimeout(() => {
+                        tooltip.classList.remove('show');
+                        copyBtn.classList.remove('copied');
+                    }, 2000);
+                } catch (err) {
+                    console.error('Failed to copy text:', err);
+                }
+            });
+        }
+
+        // Session management functionality
+        const createTeacherSession = document.getElementById('createTeacherSession');
+        const joinTeacherSession = document.getElementById('joinTeacherSession');
+        const joinStudentSession = document.getElementById('joinStudentSession');
+        const teacherCodeInput = document.getElementById('teacherCodeInput');
+        const studentCodeInput = document.getElementById('studentCodeInput');
+        const teacherCode = document.getElementById('teacherCode');
+        const studentCode = document.getElementById('studentCode');
+        const teacherError = document.getElementById('teacherError');
+        const studentError = document.getElementById('studentError');
+
+        // Setup copy buttons
+        setupCopyButton(teacherCode);
+        setupCopyButton(studentCode);
+
+        // Create new teacher session
+        createTeacherSession.addEventListener('click', async () => {
+            try {
+                const response = await fetch(`${API_PREFIX}/create_teacher_session`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    teacherCode.style.display = 'block';
+                    studentCode.style.display = 'block';
+                    teacherCode.querySelector('.code-text').textContent = `Teacher Code: ${data.data.teacher_code}`;
+                    studentCode.querySelector('.code-text').textContent = `Student Code: ${data.data.student_code}`;
+                    teacherError.style.display = 'none';
+                } else {
+                    teacherError.style.display = 'block';
+                    teacherError.textContent = data.error || 'Failed to create session';
+                }
+            } catch (error) {
+                teacherError.style.display = 'block';
+                teacherError.textContent = 'Failed to create session';
+            }
+        });
+
+        // Join teacher session
+        joinTeacherSession.addEventListener('click', async () => {
+            const code = teacherCodeInput.value.trim();
+            if (!code) {
+                teacherError.style.display = 'block';
+                teacherError.textContent = 'Please enter a teacher code';
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_PREFIX}/validate_teacher_session`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ teacher_code: code })
+                });
+                const data = await response.json();
+                
+                if (data.success && data.data.valid) {
+                    window.location.href = `/teacher?code=${code}`;
+                } else {
+                    teacherError.style.display = 'block';
+                    teacherError.textContent = 'Invalid teacher code';
+                }
+            } catch (error) {
+                teacherError.style.display = 'block';
+                teacherError.textContent = 'Failed to validate session';
+            }
+        });
+
+        // Join student session
+        joinStudentSession.addEventListener('click', async () => {
+            const code = studentCodeInput.value.trim();
+            if (!code) {
+                studentError.style.display = 'block';
+                studentError.textContent = 'Please enter a student code';
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_PREFIX}/validate_student_session`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ student_code: code })
+                });
+                const data = await response.json();
+                
+                if (data.success && data.data.valid) {
+                    window.location.href = `/student?code=${code}`;
+                } else {
+                    studentError.style.display = 'block';
+                    studentError.textContent = 'Invalid student code';
+                }
+            } catch (error) {
+                studentError.style.display = 'block';
+                studentError.textContent = 'Failed to validate session';
+            }
+        });
+    </script>
+</body>
+</html>

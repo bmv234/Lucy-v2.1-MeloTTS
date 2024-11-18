@@ -1,4 +1,4 @@
-from flask import Blueprint, send_from_directory, request, jsonify
+from flask import Blueprint, send_from_directory, request, jsonify, redirect, url_for
 import numpy as np
 import base64
 from typing import Dict, Any
@@ -6,10 +6,112 @@ from typing import Dict, Any
 from speech_services import SpeechServices
 from utils import create_response, preprocess_audio, log_error
 from config import SUPPORTED_LANGUAGES
+from sessions import session_manager
+from database import db
 
 # Create blueprint for API routes
 api = Blueprint('api', __name__)
 speech_services = SpeechServices()
+
+# Session management routes
+@api.route('/create_teacher_session', methods=['POST'])
+def create_teacher_session():
+    """Create a new teacher session."""
+    try:
+        session_data = session_manager.create_teacher_session()
+        return create_response(True, session_data)
+    except Exception as e:
+        log_error(e, "Failed to create teacher session")
+        return create_response(False, error=str(e))
+
+@api.route('/validate_teacher_session', methods=['POST'])
+def validate_teacher_session():
+    """Validate a teacher session code."""
+    try:
+        if not request.is_json:
+            return create_response(False, error="Request must be JSON")
+            
+        data = request.get_json()
+        teacher_code = data.get('teacher_code')
+        
+        if not teacher_code:
+            return create_response(False, error="Teacher code is required")
+            
+        is_valid = session_manager.validate_teacher_session(teacher_code)
+        
+        if is_valid:
+            # Get associated student code and session data
+            session_codes = session_manager.get_session_codes(teacher_code)
+            if session_codes:
+                _, student_code = session_codes
+                # Get stored session data
+                session_data = db.get_session_data(teacher_code)
+                transcription = ' '.join(item[0] for item in session_data) if session_data else ''
+                translation = ' '.join(item[1] for item in session_data) if session_data else ''
+                return create_response(True, {
+                    "valid": True, 
+                    "student_code": student_code,
+                    "transcription": transcription,
+                    "translation": translation
+                })
+        
+        return create_response(True, {"valid": False})
+    except Exception as e:
+        log_error(e, "Failed to validate teacher session")
+        return create_response(False, error=str(e))
+
+@api.route('/validate_student_session', methods=['POST'])
+def validate_student_session():
+    """Validate a student session code."""
+    try:
+        if not request.is_json:
+            return create_response(False, error="Request must be JSON")
+            
+        data = request.get_json()
+        student_code = data.get('student_code')
+        
+        if not student_code:
+            return create_response(False, error="Student code is required")
+            
+        is_valid = session_manager.validate_student_session(student_code)
+        
+        if is_valid:
+            # Get teacher code and session data
+            teacher_code = db.get_teacher_code_for_student(student_code)
+            if teacher_code:
+                session_data = db.get_session_data(teacher_code)
+                transcription = ' '.join(item[0] for item in session_data) if session_data else ''
+                translation = ' '.join(item[1] for item in session_data) if session_data else ''
+                return create_response(True, {
+                    "valid": True,
+                    "teacher_code": teacher_code,  # Added teacher_code to response
+                    "transcription": transcription,
+                    "translation": translation
+                })
+        
+        return create_response(True, {"valid": False})
+    except Exception as e:
+        log_error(e, "Failed to validate student session")
+        return create_response(False, error=str(e))
+
+@api.route('/clear_session', methods=['POST'])
+def clear_session():
+    """Clear session data."""
+    try:
+        if not request.is_json:
+            return create_response(False, error="Request must be JSON")
+            
+        data = request.get_json()
+        teacher_code = data.get('teacher_code')
+        
+        if not teacher_code:
+            return create_response(False, error="Teacher code is required")
+            
+        success = db.clear_session_data(teacher_code)
+        return create_response(success)
+    except Exception as e:
+        log_error(e, "Failed to clear session")
+        return create_response(False, error=str(e))
 
 @api.route('/languages', methods=['GET'])
 def get_languages():
@@ -50,6 +152,10 @@ def process_audio():
         to_code = data.get('to_code', 'en')
         voice_id = data.get('voice', 'EN')
         speed = float(data.get('speed', 1.0))
+        teacher_code = data.get('teacher_code')
+
+        if not teacher_code:
+            return create_response(False, error="Teacher code is required")
 
         # Process audio through pipeline
         audio = np.frombuffer(audio_data, dtype=np.int16).astype(np.float32) / 32768.0
@@ -61,11 +167,11 @@ def process_audio():
         # Translate
         translation = speech_services.translate(transcription, from_code, to_code)
         
+        # Store session data
+        db.store_session_data(teacher_code, transcription, translation)
+        
         # Synthesize translated text
         synthesis_result = speech_services.synthesize_speech(translation, voice_id, speed)
-        
-        # Debug log
-        print(f"Process audio word timings: {synthesis_result['word_timings']}")
         
         # Encode audio to base64 for response
         audio_base64 = base64.b64encode(synthesis_result['audio']).decode('utf-8')
@@ -76,8 +182,6 @@ def process_audio():
             "audio": audio_base64,
             "word_timings": synthesis_result['word_timings']
         }
-        
-        print(f"Process audio response data: {response_data}")
         
         return create_response(True, response_data)
 
@@ -100,15 +204,8 @@ def synthesize():
         if not text:
             return create_response(False, error="Text is required")
 
-        print(f"Synthesizing text: {text}")
-        print(f"Voice: {voice_id}")
-        print(f"Speed: {speed}")
-
         # Synthesize speech with word timings
         synthesis_result = speech_services.synthesize_speech(text, voice_id, speed)
-        
-        # Debug log
-        print(f"Synthesis word timings: {synthesis_result['word_timings']}")
         
         # Encode audio to base64 for response
         audio_base64 = base64.b64encode(synthesis_result['audio']).decode('utf-8')
@@ -117,8 +214,6 @@ def synthesize():
             "audio": audio_base64,
             "word_timings": synthesis_result['word_timings']
         }
-        
-        print(f"Synthesis response data: {response_data}")
         
         return create_response(True, response_data)
 
@@ -130,6 +225,11 @@ def synthesize():
 static = Blueprint('static', __name__)
 
 @static.route('/')
+def serve_landing():
+    """Serve landing page."""
+    return send_from_directory('.', 'session.html')
+
+@static.route('/teacher')
 def serve_teacher():
     """Serve teacher's page."""
     return send_from_directory('.', 'index.html')
