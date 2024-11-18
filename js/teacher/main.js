@@ -19,6 +19,7 @@ class TeacherApp {
         this.transcriptionText = document.getElementById('transcriptionText');
         this.translationText = document.getElementById('translationText');
         this.darkModeToggle = document.getElementById('darkModeToggle');
+        this.downloadButton = document.getElementById('downloadButton');
         
         // Create status element
         this.statusDiv = StatusMessage.createStatusElement(
@@ -37,15 +38,52 @@ class TeacherApp {
         this.languagePairs = {};
     }
 
+    downloadSession() {
+        const transcription = this.transcriptionText.value.trim();
+        const translation = this.translationText.value.trim();
+        
+        const content = `Original Text:\n\n${transcription}\n\n\nTranslation:\n\n${translation}`;
+        
+        const blob = new Blob([content], { type: 'text/plain' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        
+        // Create timestamp in local timezone with simpler format
+        const now = new Date();
+        const timestamp = now.toLocaleString('en-US', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+        }).replace(/[/,: ]/g, '-');
+        
+        a.href = url;
+        a.download = `conversation-session-${timestamp}.txt`;
+        document.body.appendChild(a);
+        a.click();
+        
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+    }
+
     initAudioHandler() {
         this.audioHandler = new AudioHandler({
             onTranscriptionUpdate: (text) => {
                 this.transcriptionText.value += `${text}\n\n`;
                 this.transcriptionText.scrollTop = this.transcriptionText.scrollHeight;
+                // Store in localStorage for student page
+                const storedTranscription = localStorage.getItem('transcriptionText') || '';
+                localStorage.setItem('transcriptionText', storedTranscription + text + '\n\n');
             },
             onTranslationUpdate: (text) => {
                 this.translationText.value += `${text}\n\n`;
                 this.translationText.scrollTop = this.translationText.scrollHeight;
+                // Store in localStorage for student page
+                const storedTranslation = localStorage.getItem('incomingText') || '';
+                localStorage.setItem('incomingText', storedTranslation + text + '\n\n');
             },
             onStatusChange: (message, type) => {
                 StatusMessage.show(message, type, this.statusDiv);
@@ -58,6 +96,7 @@ class TeacherApp {
         this.startButton.addEventListener('click', () => this.startListening());
         this.stopButton.addEventListener('click', () => this.stopListening());
         this.clearButton.addEventListener('click', () => this.clearResults());
+        this.downloadButton.addEventListener('click', () => this.downloadSession());
         
         // Language selection
         this.fromLanguage.addEventListener('change', () => this.updateToLanguages());
@@ -161,6 +200,9 @@ class TeacherApp {
     clearResults() {
         this.transcriptionText.value = '';
         this.translationText.value = '';
+        // Clear localStorage as well
+        localStorage.setItem('transcriptionText', '');
+        localStorage.setItem('incomingText', '');
     }
 }
 

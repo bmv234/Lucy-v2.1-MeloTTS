@@ -8,6 +8,7 @@ class StudentApp {
         this.setupEventListeners();
         this.setupBroadcastChannel();
         this.pendingAudio = null;
+        this.loadStoredContent();
     }
 
     initElements() {
@@ -19,9 +20,64 @@ class StudentApp {
         this.speedControl = document.getElementById('speedControl');
         this.voiceSelect = document.getElementById('voiceSelect');
         this.darkModeToggle = document.getElementById('darkModeToggle');
+        this.downloadButton = document.getElementById('downloadButton');
 
         // Initialize dark mode
         DarkMode.init(this.darkModeToggle);
+    }
+
+    loadStoredContent() {
+        // Load stored content from localStorage
+        const storedTranscription = localStorage.getItem('transcriptionText');
+        const storedTranslation = localStorage.getItem('incomingText');
+
+        if (storedTranscription) {
+            this.transcriptionText.innerHTML = storedTranscription;
+        }
+        if (storedTranslation) {
+            // Create word spans for highlighting in stored translation
+            const words = storedTranslation.split(' ').map(word => 
+                `<span class="word">${word}</span>`
+            ).join(' ');
+            this.incomingText.innerHTML = words;
+        }
+    }
+
+    saveContent() {
+        // Save content to localStorage
+        localStorage.setItem('transcriptionText', this.transcriptionText.innerHTML);
+        localStorage.setItem('incomingText', this.incomingText.innerHTML);
+    }
+
+    downloadSession() {
+        const transcription = this.transcriptionText.textContent.trim();
+        const translation = this.incomingText.textContent.trim();
+        
+        const content = `Original Text:\n\n${transcription}\n\n\nTranslation:\n\n${translation}`;
+        
+        const blob = new Blob([content], { type: 'text/plain' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        
+        // Create timestamp in local timezone with simpler format
+        const now = new Date();
+        const timestamp = now.toLocaleString('en-US', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+        }).replace(/[/,: ]/g, '-');
+        
+        a.href = url;
+        a.download = `conversation-session-${timestamp}.txt`;
+        document.body.appendChild(a);
+        a.click();
+        
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
     }
 
     initAudioPlayer() {
@@ -70,12 +126,16 @@ class StudentApp {
             this.audioPlayer.setSpeed(speed);
         });
 
+        // Download button
+        this.downloadButton.addEventListener('click', () => this.downloadSession());
+
         // Auto-scroll when new content is added
         const observeTextBox = (element) => {
             const observer = new MutationObserver((mutations) => {
                 mutations.forEach((mutation) => {
                     if (mutation.type === 'childList') {
                         element.scrollTop = element.scrollHeight;
+                        this.saveContent(); // Save content whenever it changes
                     }
                 });
             });
@@ -111,6 +171,9 @@ class StudentApp {
                     this.incomingText.innerHTML += words + '<br><br>';
                     this.synthesizeAndPlay(translation, true);
                 }
+                
+                // Save content after updates
+                this.saveContent();
             }
         };
     }
