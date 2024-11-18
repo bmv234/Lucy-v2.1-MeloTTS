@@ -32,11 +32,12 @@ class StudentApp {
         const storedTranslation = localStorage.getItem('incomingText');
 
         if (storedTranscription) {
-            this.transcriptionText.innerHTML = storedTranscription;
+            // For transcription, just add the text
+            this.transcriptionText.textContent = storedTranscription;
         }
         if (storedTranslation) {
-            // Create word spans for highlighting in stored translation
-            const words = storedTranslation.split(' ').map(word => 
+            // For translation, create fresh word spans
+            const words = storedTranslation.split(' ').filter(word => word.trim()).map(word => 
                 `<span class="word">${word}</span>`
             ).join(' ');
             this.incomingText.innerHTML = words;
@@ -44,9 +45,9 @@ class StudentApp {
     }
 
     saveContent() {
-        // Save content to localStorage
-        localStorage.setItem('transcriptionText', this.transcriptionText.innerHTML);
-        localStorage.setItem('incomingText', this.incomingText.innerHTML);
+        // Save plain text content to localStorage
+        localStorage.setItem('transcriptionText', this.transcriptionText.textContent);
+        localStorage.setItem('incomingText', this.incomingText.textContent);
     }
 
     downloadSession() {
@@ -135,7 +136,6 @@ class StudentApp {
                 mutations.forEach((mutation) => {
                     if (mutation.type === 'childList') {
                         element.scrollTop = element.scrollHeight;
-                        this.saveContent(); // Save content whenever it changes
                     }
                 });
             });
@@ -157,19 +157,22 @@ class StudentApp {
                 const transcription = event.data.transcription || '';
                 const translation = event.data.text || '';
                 
-                // Update transcription box
+                // Update transcription box with plain text
                 if (transcription) {
-                    this.transcriptionText.innerHTML += transcription + ' ';
+                    this.transcriptionText.textContent += transcription + ' ';
                 }
                 
                 // Update translation box with word spans for highlighting
                 if (translation) {
-                    const words = translation.split(' ').map(word => 
+                    const words = translation.split(' ').filter(word => word.trim()).map(word => 
                         `<span class="word">${word}</span>`
                     ).join(' ');
                     this.incomingText.innerHTML += words + ' ';
                     this.synthesizeAndPlay(translation, true);
                 }
+                
+                // Save plain text content
+                this.saveContent();
             }
         };
     }
