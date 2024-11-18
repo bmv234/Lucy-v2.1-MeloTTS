@@ -72,18 +72,18 @@ class TeacherApp {
     initAudioHandler() {
         this.audioHandler = new AudioHandler({
             onTranscriptionUpdate: (text) => {
-                this.transcriptionText.value += `${text}\n\n`;
+                this.transcriptionText.value += `${text} `;
                 this.transcriptionText.scrollTop = this.transcriptionText.scrollHeight;
-                // Store in localStorage for student page
+                // Store in localStorage for student page without newlines
                 const storedTranscription = localStorage.getItem('transcriptionText') || '';
-                localStorage.setItem('transcriptionText', storedTranscription + text + '\n\n');
+                localStorage.setItem('transcriptionText', storedTranscription + text + ' ');
             },
             onTranslationUpdate: (text) => {
-                this.translationText.value += `${text}\n\n`;
+                this.translationText.value += `${text} `;
                 this.translationText.scrollTop = this.translationText.scrollHeight;
-                // Store in localStorage for student page
+                // Store in localStorage for student page without newlines
                 const storedTranslation = localStorage.getItem('incomingText') || '';
-                localStorage.setItem('incomingText', storedTranslation + text + '\n\n');
+                localStorage.setItem('incomingText', storedTranslation + text + ' ');
             },
             onStatusChange: (message, type) => {
                 StatusMessage.show(message, type, this.statusDiv);

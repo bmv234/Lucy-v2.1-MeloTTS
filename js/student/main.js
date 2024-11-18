@@ -159,21 +159,17 @@ class StudentApp {
                 
                 // Update transcription box
                 if (transcription) {
-                    this.transcriptionText.innerHTML += transcription + '<br><br>';
+                    this.transcriptionText.innerHTML += transcription + ' ';
                 }
                 
-                // Update translation box
+                // Update translation box with word spans for highlighting
                 if (translation) {
-                    // Create word spans for highlighting
                     const words = translation.split(' ').map(word => 
                         `<span class="word">${word}</span>`
                     ).join(' ');
-                    this.incomingText.innerHTML += words + '<br><br>';
+                    this.incomingText.innerHTML += words + ' ';
                     this.synthesizeAndPlay(translation, true);
                 }
-                
-                // Save content after updates
-                this.saveContent();
             }
         };
     }
