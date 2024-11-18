@@ -190,12 +190,11 @@ export class AudioPlayer {
             return;
         }
 
-        const elapsedTime = this.audioContext.currentTime - this.startTime;
-        const adjustedTime = elapsedTime * this.playbackSpeed;
+        const elapsedTime = (this.audioContext.currentTime - this.startTime) * this.playbackSpeed;
 
         // Update debug info
         if (this.debugTime) {
-            this.debugTime.textContent = `${elapsedTime.toFixed(3)} (adjusted: ${adjustedTime.toFixed(3)})`;
+            this.debugTime.textContent = elapsedTime.toFixed(3);
         }
         if (this.debugSpeed) {
             this.debugSpeed.textContent = this.playbackSpeed.toFixed(2);
@@ -208,22 +207,23 @@ export class AudioPlayer {
         let foundWord = false;
         for (let i = 0; i < Math.min(this.wordTimings.length, this.highlightedWords.length); i++) {
             const timing = this.wordTimings[i];
-            const start = timing.start;
-            const end = timing.end;
+            // Add a small offset to compensate for any delay
+            const start = timing.start - 0.05;
+            const end = timing.end - 0.05;
 
-            if (adjustedTime >= start && adjustedTime <= end) {
+            if (elapsedTime >= start && elapsedTime <= end) {
                 this.highlightedWords[i].classList.add('highlighted');
                 foundWord = true;
 
                 // Update debug info
                 if (this.debugWord) {
-                    this.debugWord.textContent = `${timing.word} [${start.toFixed(3)}-${end.toFixed(3)}] at ${adjustedTime.toFixed(3)}s`;
+                    this.debugWord.textContent = `${timing.word} [${start.toFixed(3)}-${end.toFixed(3)}] at ${elapsedTime.toFixed(3)}s`;
                 }
 
                 console.log('Highlighting:', {
                     word: timing.word,
                     index: i,
-                    adjustedTime,
+                    elapsedTime,
                     range: `${start}-${end}`,
                     speed: this.playbackSpeed
                 });
