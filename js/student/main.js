@@ -12,13 +12,13 @@ class StudentApp {
 
     initElements() {
         // UI Elements
+        this.transcriptionText = document.getElementById('transcriptionText');
         this.incomingText = document.getElementById('incomingText');
         this.playButton = document.getElementById('playButton');
         this.volumeControl = document.getElementById('volumeControl');
         this.speedControl = document.getElementById('speedControl');
         this.voiceSelect = document.getElementById('voiceSelect');
         this.darkModeToggle = document.getElementById('darkModeToggle');
-        this.highlightedText = document.getElementById('highlightedText');
 
         // Initialize dark mode
         DarkMode.init(this.darkModeToggle);
@@ -37,7 +37,7 @@ class StudentApp {
                     errorElement = document.createElement('div');
                     errorElement.id = 'audioError';
                     errorElement.className = 'error-message';
-                    this.highlightedText.parentNode.insertBefore(errorElement, this.highlightedText);
+                    this.incomingText.parentNode.insertBefore(errorElement, this.incomingText);
                 }
                 errorElement.textContent = error;
                 
@@ -71,49 +71,52 @@ class StudentApp {
         });
 
         // Auto-scroll when new content is added
-        const observer = new MutationObserver((mutations) => {
-            mutations.forEach((mutation) => {
-                if (mutation.type === 'childList') {
-                    this.incomingText.scrollTop = this.incomingText.scrollHeight;
-                }
+        const observeTextBox = (element) => {
+            const observer = new MutationObserver((mutations) => {
+                mutations.forEach((mutation) => {
+                    if (mutation.type === 'childList') {
+                        element.scrollTop = element.scrollHeight;
+                    }
+                });
             });
-        });
 
-        observer.observe(this.incomingText, {
-            childList: true,
-            subtree: true
-        });
+            observer.observe(element, {
+                childList: true,
+                subtree: true
+            });
+        };
 
-        // Add styles for error message
-        const style = document.createElement('style');
-        style.textContent = `
-            .error-message {
-                background-color: var(--error-color);
-                color: white;
-                padding: 10px;
-                border-radius: 4px;
-                margin: 10px 0;
-                opacity: 1;
-                transition: opacity 0.3s ease;
-            }
-        `;
-        document.head.appendChild(style);
+        observeTextBox(this.transcriptionText);
+        observeTextBox(this.incomingText);
     }
 
     setupBroadcastChannel() {
         this.broadcastChannel = new BroadcastChannel('lucy-v4-channel');
         this.broadcastChannel.onmessage = (event) => {
             if (event.data.type === 'translation') {
-                const newText = event.data.text;
-                this.incomingText.innerHTML += newText + '<br><br>';
-                this.highlightedText.textContent = newText;
-                this.synthesizeAndPlay(newText, true);
+                const transcription = event.data.transcription || '';
+                const translation = event.data.text || '';
+                
+                // Update transcription box
+                if (transcription) {
+                    this.transcriptionText.innerHTML += transcription + '<br><br>';
+                }
+                
+                // Update translation box
+                if (translation) {
+                    // Create word spans for highlighting
+                    const words = translation.split(' ').map(word => 
+                        `<span class="word">${word}</span>`
+                    ).join(' ');
+                    this.incomingText.innerHTML += words + '<br><br>';
+                    this.synthesizeAndPlay(translation, true);
+                }
             }
         };
     }
 
     async handlePlayClick() {
-        const text = this.highlightedText.textContent.trim();
+        const text = this.incomingText.textContent.trim();
         if (!text) {
             console.log('No text to speak');
             return;
@@ -133,7 +136,7 @@ class StudentApp {
                     {
                         volume: parseFloat(this.volumeControl.value),
                         speed: parseFloat(this.speedControl.value),
-                        highlightedTextContainer: this.highlightedText,
+                        highlightedTextContainer: this.incomingText,
                         autoPlay: false
                     }
                 );
@@ -161,7 +164,7 @@ class StudentApp {
                     {
                         volume: parseFloat(this.volumeControl.value),
                         speed: parseFloat(this.speedControl.value),
-                        highlightedTextContainer: this.highlightedText,
+                        highlightedTextContainer: this.incomingText,
                         autoPlay
                     }
                 );

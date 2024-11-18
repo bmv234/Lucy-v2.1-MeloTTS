@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Lucy v4 - Student's Page</title>
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -20,28 +20,31 @@
 
         <div class="translation-container">
             <div class="incoming-text">
-                <h3>Incoming Translation</h3>
+                <h3>Original Text</h3>
+                <div id="transcriptionText" class="text-display"></div>
+            </div>
+            <div class="incoming-text">
+                <h3>Translation</h3>
                 <div id="incomingText" class="text-display"></div>
             </div>
         </div>
 
-        <div class="tts-controls">
+        <div class="playback-controls">
             <div class="voice-container">
-                <label for="voiceSelect">Voice</label>
                 <select id="voiceSelect" class="voice-select">
                     <option value="EN-US">English (American)</option>
                     <option value="EN">English (Default)</option>
                     <option value="ES">Spanish</option>
                     <option value="FR">French</option>
                     <option value="ZH">Chinese</option>
-                    <option value="JP">Japanese</option>
+                    <option value="JA">Japanese</option>
                 </select>
             </div>
 
             <button id="playButton" class="control-btn">
                 <span class="btn-icon">▶</span>
             </button>
-            
+
             <div class="slider-container">
                 <label for="volumeControl">Volume</label>
                 <input type="range" id="volumeControl" min="0" max="1" step="0.1" value="1">
@@ -52,8 +55,6 @@
                 <input type="range" id="speedControl" min="0.25" max="1.5" step="0.05" value="1">
             </div>
         </div>
-
-        <div id="highlightedText" class="highlighted-text"></div>
     </div>
     <script type="module" src="js/student/main.js"></script>
 </body>

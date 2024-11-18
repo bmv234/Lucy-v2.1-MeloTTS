@@ -163,15 +163,16 @@ export class AudioHandler {
         
         if (data.translation) {
             this.onTranslationUpdate(data.translation);
-            this.broadcastResults(data.translation);
+            this.broadcastResults(data.transcription, data.translation);
         }
         
         this.onStatusChange('Ready', 'success');
     }
 
-    broadcastResults(translation) {
+    broadcastResults(transcription, translation) {
         this.broadcastChannel.postMessage({
             type: 'translation',
+            transcription: transcription,
             text: translation,
             fromLang: this.fromLanguage,
             toLang: this.toLanguage
