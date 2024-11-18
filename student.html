@@ -5,6 +5,32 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Lucy v4 - Student's Page</title>
     <link rel="stylesheet" href="styles.css">
+    <style>
+        /* Debug panel styles */
+        #debugPanel {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0, 0, 0, 0.8);
+            color: #fff;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1000;
+            display: none;
+        }
+        /* Show debug panel when debug mode is active */
+        body.debug #debugPanel {
+            display: block;
+        }
+        /* Adjust container padding when debug panel is visible */
+        body.debug .container {
+            padding-bottom: 220px;
+        }
+    </style>
 </head>
 <body class="dark-mode">
     <div class="container">
@@ -15,6 +41,8 @@
                     <span class="toggle-icon">☀️</span>
                 </button>
                 <button id="downloadButton" class="control-btn">Download Session</button>
+                <!-- Add debug toggle button -->
+                <button id="debugToggle" class="control-btn" style="font-size: 0.8em;">Debug</button>
             </div>
         </div>
 
@@ -56,6 +84,15 @@
             </div>
         </div>
     </div>
+
+    <!-- Debug panel -->
+    <div id="debugPanel">
+        <div>Current Time: <span id="debugTime">0</span></div>
+        <div>Speed: <span id="debugSpeed">1</span></div>
+        <div>Current Word: <span id="debugWord">none</span></div>
+        <div>Word Timings: <pre id="debugTimings"></pre></div>
+    </div>
+
     <script type="module" src="js/student/main.js"></script>
 </body>
 </html>

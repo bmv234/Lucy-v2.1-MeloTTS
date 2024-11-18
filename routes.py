@@ -62,16 +62,24 @@ def process_audio():
         translation = speech_services.translate(transcription, from_code, to_code)
         
         # Synthesize translated text
-        synthesized_audio = speech_services.synthesize_speech(translation, voice_id, speed)
+        synthesis_result = speech_services.synthesize_speech(translation, voice_id, speed)
+        
+        # Debug log
+        print(f"Process audio word timings: {synthesis_result['word_timings']}")
         
         # Encode audio to base64 for response
-        audio_base64 = base64.b64encode(synthesized_audio).decode('utf-8')
+        audio_base64 = base64.b64encode(synthesis_result['audio']).decode('utf-8')
         
-        return create_response(True, {
+        response_data = {
             "transcription": transcription,
             "translation": translation,
-            "audio": audio_base64
-        })
+            "audio": audio_base64,
+            "word_timings": synthesis_result['word_timings']
+        }
+        
+        print(f"Process audio response data: {response_data}")
+        
+        return create_response(True, response_data)
 
     except Exception as e:
         log_error(e, "Failed to process audio")
@@ -92,13 +100,27 @@ def synthesize():
         if not text:
             return create_response(False, error="Text is required")
 
-        # Synthesize speech
-        audio_data = speech_services.synthesize_speech(text, voice_id, speed)
+        print(f"Synthesizing text: {text}")
+        print(f"Voice: {voice_id}")
+        print(f"Speed: {speed}")
+
+        # Synthesize speech with word timings
+        synthesis_result = speech_services.synthesize_speech(text, voice_id, speed)
+        
+        # Debug log
+        print(f"Synthesis word timings: {synthesis_result['word_timings']}")
         
         # Encode audio to base64 for response
-        audio_base64 = base64.b64encode(audio_data).decode('utf-8')
+        audio_base64 = base64.b64encode(synthesis_result['audio']).decode('utf-8')
         
-        return create_response(True, {"audio": audio_base64})
+        response_data = {
+            "audio": audio_base64,
+            "word_timings": synthesis_result['word_timings']
+        }
+        
+        print(f"Synthesis response data: {response_data}")
+        
+        return create_response(True, response_data)
 
     except Exception as e:
         log_error(e, "Failed to synthesize speech")

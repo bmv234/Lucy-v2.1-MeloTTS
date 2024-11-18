@@ -7,6 +7,7 @@ from typing import Dict, Optional, List, Tuple
 import torch
 import tempfile
 import os
+import logging
 
 from config import WHISPER_MODEL_ID, SUPPORTED_LANGUAGES, logger
 from utils import get_device, adjust_speed_for_model, log_error
@@ -18,6 +19,36 @@ SUPPORTED_TRANSLATION_PAIRS = [
     ('en', 'ja'), ('ja', 'en'),
     ('en', 'es'), ('es', 'en')
 ]
+
+def create_word_timings(text: str, duration: float) -> List[Dict]:
+    """Create evenly spaced word timings."""
+    words = text.strip().split()
+    if not words:
+        return []
+
+    # Calculate time per word
+    time_per_word = duration / len(words)
+    
+    # Create timing for each word
+    timings = []
+    for i, word in enumerate(words):
+        start_time = i * time_per_word
+        end_time = (i + 1) * time_per_word
+        
+        # Add a small buffer between words
+        if i < len(words) - 1:  # Not the last word
+            end_time -= time_per_word * 0.1  # 10% buffer
+            
+        timings.append({
+            'word': word,
+            'start': start_time,
+            'end': end_time,
+            'index': i
+        })
+        
+        logger.info(f"Word timing: {word} [{start_time:.3f} - {end_time:.3f}]")
+    
+    return timings
 
 class SpeechServices:
     def __init__(self):
@@ -144,8 +175,8 @@ class SpeechServices:
             log_error(e, f"Translation failed ({from_code} to {to_code})")
             raise
 
-    def synthesize_speech(self, text: str, voice_id: str = 'EN', speed: float = 1.0) -> bytes:
-        """Synthesize speech from text."""
+    def synthesize_speech(self, text: str, voice_id: str = 'EN', speed: float = 1.0) -> Dict:
+        """Synthesize speech from text and return audio data with word timings."""
         temp_file = tempfile.NamedTemporaryFile(suffix='.wav', delete=False)
         temp_path = temp_file.name
         temp_file.close()
@@ -172,7 +203,20 @@ class SpeechServices:
             tts = self.tts_models[language]
             
             # Generate speech
-            tts.tts_to_file(text, speaker_id=0, output_path=temp_path)
+            audio_data = tts.tts_to_file(
+                text=text,
+                speaker_id=0,
+                output_path=temp_path,
+                speed=speed
+            )
+
+            # Calculate audio duration
+            audio_duration = len(audio_data) / tts.hps.data.sampling_rate
+            logger.info(f"Generated audio duration: {audio_duration:.3f}s")
+
+            # Create word timings
+            word_timings = create_word_timings(text, audio_duration)
+            logger.info(f"Created {len(word_timings)} word timings")
 
             if not os.path.exists(temp_path) or os.path.getsize(temp_path) == 0:
                 raise Exception("Failed to generate audio file")
@@ -180,7 +224,10 @@ class SpeechServices:
             with open(temp_path, 'rb') as audio_file:
                 audio_data = audio_file.read()
                 
-            return audio_data
+            return {
+                'audio': audio_data,
+                'word_timings': word_timings
+            }
         except Exception as e:
             log_error(e, "Speech synthesis failed")
             raise

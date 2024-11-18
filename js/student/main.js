@@ -32,20 +32,14 @@ class StudentApp {
         const storedTranslation = localStorage.getItem('incomingText');
 
         if (storedTranscription) {
-            // For transcription, just add the text
             this.transcriptionText.textContent = storedTranscription;
         }
         if (storedTranslation) {
-            // For translation, create fresh word spans
-            const words = storedTranslation.split(' ').filter(word => word.trim()).map(word => 
-                `<span class="word">${word}</span>`
-            ).join(' ');
-            this.incomingText.innerHTML = words;
+            this.incomingText.textContent = storedTranslation;
         }
     }
 
     saveContent() {
-        // Save plain text content to localStorage
         localStorage.setItem('transcriptionText', this.transcriptionText.textContent);
         localStorage.setItem('incomingText', this.incomingText.textContent);
     }
@@ -60,7 +54,6 @@ class StudentApp {
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         
-        // Create timestamp in local timezone with simpler format
         const now = new Date();
         const timestamp = now.toLocaleString('en-US', {
             year: 'numeric',
@@ -88,7 +81,6 @@ class StudentApp {
                     isPlaying ? '⏹' : '▶';
             },
             onError: (error) => {
-                // Create or update error message element
                 let errorElement = document.getElementById('audioError');
                 if (!errorElement) {
                     errorElement = document.createElement('div');
@@ -98,39 +90,33 @@ class StudentApp {
                 }
                 errorElement.textContent = error;
                 
-                // Auto-hide error after 5 seconds
                 setTimeout(() => {
                     errorElement.style.opacity = '0';
                     setTimeout(() => {
                         if (errorElement.parentNode) {
                             errorElement.parentNode.removeChild(errorElement);
                         }
-                    }, 300); // Remove after fade out
+                    }, 300);
                 }, 5000);
             }
         });
     }
 
     setupEventListeners() {
-        // Play button
         this.playButton.addEventListener('click', () => this.handlePlayClick());
 
-        // Volume control
         this.volumeControl.addEventListener('input', (e) => {
             const volume = parseFloat(e.target.value);
             this.audioPlayer.setVolume(volume);
         });
 
-        // Speed control
         this.speedControl.addEventListener('input', (e) => {
             const speed = parseFloat(e.target.value);
             this.audioPlayer.setSpeed(speed);
         });
 
-        // Download button
         this.downloadButton.addEventListener('click', () => this.downloadSession());
 
-        // Auto-scroll when new content is added
         const observeTextBox = (element) => {
             const observer = new MutationObserver((mutations) => {
                 mutations.forEach((mutation) => {
@@ -157,21 +143,20 @@ class StudentApp {
                 const transcription = event.data.transcription || '';
                 const translation = event.data.text || '';
                 
-                // Update transcription box with plain text
                 if (transcription) {
                     this.transcriptionText.textContent += transcription + ' ';
                 }
                 
-                // Update translation box with word spans for highlighting
                 if (translation) {
-                    const words = translation.split(' ').filter(word => word.trim()).map(word => 
-                        `<span class="word">${word}</span>`
-                    ).join(' ');
-                    this.incomingText.innerHTML += words + ' ';
+                    // Store the plain text
+                    const currentText = this.incomingText.textContent;
+                    const newText = currentText ? currentText + ' ' + translation : translation;
+                    this.incomingText.textContent = newText;
+                    
+                    // Synthesize and play the new text
                     this.synthesizeAndPlay(translation, true);
                 }
                 
-                // Save plain text content
                 this.saveContent();
             }
         };
@@ -185,15 +170,18 @@ class StudentApp {
         }
 
         try {
+            console.log('Synthesizing speech for text:', text);
             const response = await API.synthesizeSpeech(
                 text,
                 this.voiceSelect.value,
                 parseFloat(this.speedControl.value)
             );
 
-            if (response.success && response.data.audio) {
+            console.log('API Response:', response);
+
+            if (response.success && response.data) {
                 await this.audioPlayer.playAudio(
-                    response.data.audio,
+                    response.data,
                     text,
                     {
                         volume: parseFloat(this.volumeControl.value),
@@ -213,15 +201,18 @@ class StudentApp {
 
     async synthesizeAndPlay(text, autoPlay = false) {
         try {
+            console.log('Auto-synthesizing speech for text:', text);
             const response = await API.synthesizeSpeech(
                 text,
                 this.voiceSelect.value,
                 parseFloat(this.speedControl.value)
             );
 
-            if (response.success && response.data.audio) {
+            console.log('Auto-play API Response:', response);
+
+            if (response.success && response.data) {
                 await this.audioPlayer.playAudio(
-                    response.data.audio,
+                    response.data,
                     text,
                     {
                         volume: parseFloat(this.volumeControl.value),
@@ -233,7 +224,6 @@ class StudentApp {
             }
         } catch (error) {
             console.error('Auto-play error:', error);
-            // Don't show error for auto-play attempts
             if (!autoPlay) {
                 this.audioPlayer.onError(`Error synthesizing speech: ${error.message}`);
             }
@@ -241,7 +231,6 @@ class StudentApp {
     }
 }
 
-// Initialize the application when the page loads
 window.addEventListener('load', () => {
     new StudentApp();
 });

@@ -68,38 +68,32 @@ export const AudioUtils = {
 // Text highlighting
 export const TextHighlighter = {
     createWordSpans(text, container) {
-        container.innerHTML = text.split(' ').map(word => 
-            `<span class="word">${word}</span>`
-        ).join(' ');
-    },
-
-    highlightWords(words, duration, onComplete) {
-        if (words.length === 0) return;
-
-        const timePerWord = duration / words.length;
-        let currentWordIndex = 0;
+        // Split text into words, preserving punctuation
+        const words = text.split(/\s+/).filter(word => word.trim());
         
-        const interval = setInterval(() => {
-            // Remove previous highlight
-            if (currentWordIndex > 0) {
-                words[currentWordIndex - 1].classList.remove('highlighted');
-            }
-            
-            // Add new highlight
-            words[currentWordIndex].classList.add('highlighted');
-            currentWordIndex++;
-
-            if (currentWordIndex >= words.length) {
-                clearInterval(interval);
-                if (onComplete) onComplete();
-            }
-        }, timePerWord);
-
-        return interval;
+        // Create spans for each word
+        const spans = words.map((word, index) => 
+            `<span class="word" data-index="${index}">${word}</span>`
+        );
+        
+        // Join spans with spaces
+        container.innerHTML = spans.join(' ');
+        
+        console.log('Created word spans:', {
+            originalText: text,
+            wordCount: words.length,
+            spans: container.getElementsByClassName('word')
+        });
     },
 
     clearHighlights(words) {
-        words.forEach(word => word.classList.remove('highlighted'));
+        if (Array.isArray(words)) {
+            words.forEach(word => {
+                if (word && word.classList) {
+                    word.classList.remove('highlighted');
+                }
+            });
+        }
     }
 };
 
@@ -122,6 +116,8 @@ export const API = {
     },
 
     async synthesizeSpeech(text, voice, speed) {
+        console.log('Synthesizing speech:', { text, voice, speed });
+        
         const response = await fetch('/api/v1/synthesize', {
             method: 'POST',
             headers: {
@@ -141,7 +137,27 @@ export const API = {
             throw new Error(errorMessage);
         }
 
-        return response.json();
+        const result = await response.json();
+        
+        // Log the response data
+        console.log('Synthesis response:', {
+            success: result.success,
+            hasAudio: !!result.data?.audio,
+            wordTimings: result.data?.word_timings,
+            timingsLength: result.data?.word_timings?.length
+        });
+
+        // Validate word timings
+        if (result.data?.word_timings) {
+            result.data.word_timings.forEach((timing, index) => {
+                console.log(`Word timing ${index}:`, timing);
+                if (!timing.word || typeof timing.start !== 'number' || typeof timing.end !== 'number') {
+                    console.error('Invalid word timing:', timing);
+                }
+            });
+        }
+
+        return result;
     },
 
     async processAudio(audioData, fromCode, toCode, voice) {
@@ -162,6 +178,16 @@ export const API = {
             throw new Error(`Failed to process audio: ${response.statusText}`);
         }
 
-        return response.json();
+        const result = await response.json();
+        
+        // Log the response data
+        console.log('Process audio response:', {
+            success: result.success,
+            hasAudio: !!result.data?.audio,
+            wordTimings: result.data?.word_timings,
+            timingsLength: result.data?.word_timings?.length
+        });
+
+        return result;
     }
 };

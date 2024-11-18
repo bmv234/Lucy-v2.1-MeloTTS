@@ -1,3 +1,23 @@
+/* Previous CSS content remains unchanged until the word highlighting styles */
+
+/* Word highlighting styles */
+.word {
+    display: inline-block;
+    padding: 2px 4px;
+    margin: 0 1px;
+    border-radius: 3px;
+    transition: all 0.15s ease-out;
+    position: relative;
+}
+
+.word.highlighted {
+    background-color: var(--highlight-color);
+    color: #000;
+    font-weight: 500;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Rest of the CSS content remains unchanged */
 :root {
     /* Light mode colors (not default) */
     --light-bg-color: #ffffff;
@@ -187,6 +207,7 @@ textarea {
     box-sizing: border-box;
     overflow-y: auto;
     line-height: 1.6;
+    font-size: 1.1rem;
 }
 
 .playback-controls {
@@ -258,17 +279,6 @@ textarea {
     accent-color: var(--primary-color);
 }
 
-/* Word highlighting styles */
-.word {
-    display: inline-block;
-    padding: 0 2px;
-    border-radius: 3px;
-}
-
-.highlighted {
-    background-color: var(--highlight-color);
-}
-
 /* Select element styles */
 select option {
     background-color: var(--bg-color);
@@ -312,6 +322,31 @@ select option {
     margin: 10px 0;
     opacity: 1;
     transition: opacity 0.3s ease;
+}
+
+/* Debug panel styles */
+#debugPanel {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(0, 0, 0, 0.9);
+    color: #fff;
+    padding: 10px;
+    font-family: monospace;
+    font-size: 12px;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 1000;
+    display: none;
+}
+
+body.debug #debugPanel {
+    display: block;
+}
+
+body.debug .container {
+    padding-bottom: 220px;
 }
 
 /* Mobile responsive styles */

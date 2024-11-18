@@ -7,11 +7,45 @@ export class AudioPlayer {
         
         this.isPlaying = false;
         this.currentAudio = null;
-        this.highlightInterval = null;
+        this.audioContext = null;
+        this.audioSource = null;
+        this.animationFrameId = null;
         this.hasUserInteracted = false;
+        this.wordTimings = null;
+        this.highlightedWords = null;
+        this.currentWordIndex = -1;
+        this.startTime = 0;
+        this.playbackSpeed = 1.0;
+
+        // Debug elements
+        this.debugPanel = document.getElementById('debugPanel');
+        this.debugTime = document.getElementById('debugTime');
+        this.debugSpeed = document.getElementById('debugSpeed');
+        this.debugWord = document.getElementById('debugWord');
+        this.debugTimings = document.getElementById('debugTimings');
+
+        // Setup debug toggle
+        const debugToggle = document.getElementById('debugToggle');
+        if (debugToggle) {
+            debugToggle.addEventListener('click', () => {
+                document.body.classList.toggle('debug');
+            });
+        }
+
+        // Initialize Web Audio Context
+        this.initAudioContext();
     }
 
-    async playAudio(audioBase64, text, options = {}) {
+    initAudioContext() {
+        try {
+            window.AudioContext = window.AudioContext || window.webkitAudioContext;
+            this.audioContext = new AudioContext();
+        } catch (e) {
+            console.error('Web Audio API not supported:', e);
+        }
+    }
+
+    async playAudio(audioData, text, options = {}) {
         const {
             volume = 1.0,
             speed = 1.0,
@@ -25,56 +59,78 @@ export class AudioPlayer {
         }
 
         try {
-            const audioBlob = AudioUtils.base64ToBlob(audioBase64);
-            this.currentAudio = await AudioUtils.createAudioElement(audioBlob, volume);
-            
-            // Set up event listeners
-            this.currentAudio.addEventListener('error', (e) => {
-                console.error('Audio error:', e);
-                this.stop();
-                // More user-friendly error message
-                if (!this.hasUserInteracted && autoPlay) {
-                    this.onError('Please click the play button to start audio playback');
-                } else {
-                    this.onError('Error playing audio. Please try again.');
-                }
+            // Handle new response format that includes word timings
+            const audioBase64 = typeof audioData === 'string' ? audioData : audioData.audio;
+            this.wordTimings = typeof audioData === 'string' ? null : audioData.word_timings;
+
+            console.log('Received audio data:', { 
+                hasAudio: !!audioBase64, 
+                wordTimings: this.wordTimings 
             });
 
-            this.currentAudio.addEventListener('ended', () => {
+            const audioBlob = AudioUtils.base64ToBlob(audioBase64);
+            const arrayBuffer = await audioBlob.arrayBuffer();
+            
+            // Resume audio context if suspended
+            if (this.audioContext.state === 'suspended') {
+                await this.audioContext.resume();
+            }
+
+            // Decode audio data
+            const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+            
+            // Create source node
+            this.audioSource = this.audioContext.createBufferSource();
+            this.audioSource.buffer = audioBuffer;
+            
+            // Create gain node for volume control
+            const gainNode = this.audioContext.createGain();
+            gainNode.gain.value = volume;
+            
+            // Connect nodes
+            this.audioSource.connect(gainNode);
+            gainNode.connect(this.audioContext.destination);
+            
+            // Set playback speed
+            this.playbackSpeed = speed;
+            this.audioSource.playbackRate.value = speed;
+
+            // Setup event listeners
+            this.audioSource.onended = () => {
                 console.log('Audio playback ended');
                 this.stop();
-            });
+            };
 
-            // Set playback speed
-            this.currentAudio.playbackRate = speed;
+            // Create word spans if container provided
+            if (highlightedTextContainer && text && this.wordTimings) {
+                // Create spans using the actual words from word timings
+                const words = this.wordTimings.map(t => t.word);
+                highlightedTextContainer.innerHTML = words.map((word, i) => 
+                    `<span class="word" data-index="${i}">${word}</span>`
+                ).join(' ');
+                
+                this.highlightedWords = Array.from(highlightedTextContainer.getElementsByClassName('word'));
+                
+                console.log('Created word elements:', {
+                    count: this.highlightedWords.length,
+                    words: this.highlightedWords.map(w => w.textContent)
+                });
+            }
 
             // Start playback
-            try {
-                await this.currentAudio.play();
-                this.isPlaying = true;
-                this.hasUserInteracted = true;
-                this.onPlayStateChange(true);
+            this.startTime = this.audioContext.currentTime;
+            this.audioSource.start();
+            this.isPlaying = true;
+            this.hasUserInteracted = true;
+            this.onPlayStateChange(true);
 
-                // Handle text highlighting if container is provided
-                if (highlightedTextContainer && text) {
-                    this.setupTextHighlighting(text, highlightedTextContainer);
-                }
-            } catch (playError) {
-                console.error('Playback error:', playError);
-                
-                if (!this.hasUserInteracted && autoPlay) {
-                    // Don't show error for autoplay restriction
-                    console.log('Autoplay restricted, waiting for user interaction');
-                } else {
-                    throw playError;
-                }
-            }
+            // Start highlighting animation
+            this.updateHighlighting();
 
         } catch (error) {
             console.error('Audio setup error:', error);
             this.stop();
             
-            // More specific error messages
             if (error.name === 'NotAllowedError') {
                 this.onError('Please click the play button to start audio playback');
             } else {
@@ -84,61 +140,102 @@ export class AudioPlayer {
     }
 
     stop() {
-        if (this.currentAudio) {
-            this.currentAudio.pause();
-            URL.revokeObjectURL(this.currentAudio.src);
-            this.currentAudio = null;
+        if (this.audioSource) {
+            try {
+                this.audioSource.stop();
+            } catch (e) {
+                // Ignore errors if already stopped
+            }
+            this.audioSource = null;
         }
 
-        if (this.highlightInterval) {
-            clearInterval(this.highlightInterval);
-            this.highlightInterval = null;
+        if (this.animationFrameId) {
+            cancelAnimationFrame(this.animationFrameId);
+            this.animationFrameId = null;
         }
 
+        // Clear highlights
+        if (this.highlightedWords) {
+            TextHighlighter.clearHighlights(this.highlightedWords);
+            this.highlightedWords = null;
+        }
+
+        this.wordTimings = null;
+        this.currentWordIndex = -1;
         this.isPlaying = false;
         this.onPlayStateChange(false);
     }
 
     setVolume(volume) {
-        if (this.currentAudio) {
-            this.currentAudio.volume = volume;
+        if (this.audioContext && this.audioSource) {
+            const gainNode = this.audioContext.createGain();
+            gainNode.gain.value = volume;
+            this.audioSource.connect(gainNode);
+            gainNode.connect(this.audioContext.destination);
         }
     }
 
     setSpeed(speed) {
-        if (this.currentAudio) {
-            this.currentAudio.playbackRate = speed;
+        if (this.audioSource) {
+            this.playbackSpeed = speed;
+            this.audioSource.playbackRate.value = speed;
+            if (this.debugSpeed) {
+                this.debugSpeed.textContent = speed;
+            }
         }
     }
 
-    setupTextHighlighting(text, container) {
-        // Clear any existing highlights
-        TextHighlighter.clearHighlights(
-            Array.from(container.getElementsByClassName('word'))
-        );
-
-        // Create word spans
-        TextHighlighter.createWordSpans(text, container);
-
-        // Start highlighting words
-        const words = Array.from(container.getElementsByClassName('word'));
-        if (words.length > 0 && this.currentAudio) {
-            this.highlightInterval = TextHighlighter.highlightWords(
-                words,
-                this.currentAudio.duration * 1000,
-                () => {
-                    // Cleanup when highlighting is complete
-                    this.highlightInterval = null;
-                }
-            );
-
-            // Clear interval if audio ends early
-            this.currentAudio.addEventListener('ended', () => {
-                if (this.highlightInterval) {
-                    clearInterval(this.highlightInterval);
-                    this.highlightInterval = null;
-                }
-            });
+    updateHighlighting() {
+        if (!this.isPlaying || !this.audioSource || !this.wordTimings || !this.highlightedWords) {
+            return;
         }
+
+        const elapsedTime = this.audioContext.currentTime - this.startTime;
+        const adjustedTime = elapsedTime * this.playbackSpeed;
+
+        // Update debug info
+        if (this.debugTime) {
+            this.debugTime.textContent = `${elapsedTime.toFixed(3)} (adjusted: ${adjustedTime.toFixed(3)})`;
+        }
+        if (this.debugSpeed) {
+            this.debugSpeed.textContent = this.playbackSpeed.toFixed(2);
+        }
+
+        // Clear previous highlights
+        TextHighlighter.clearHighlights(this.highlightedWords);
+
+        // Find and highlight current word
+        let foundWord = false;
+        for (let i = 0; i < Math.min(this.wordTimings.length, this.highlightedWords.length); i++) {
+            const timing = this.wordTimings[i];
+            const start = timing.start;
+            const end = timing.end;
+
+            if (adjustedTime >= start && adjustedTime <= end) {
+                this.highlightedWords[i].classList.add('highlighted');
+                foundWord = true;
+
+                // Update debug info
+                if (this.debugWord) {
+                    this.debugWord.textContent = `${timing.word} [${start.toFixed(3)}-${end.toFixed(3)}] at ${adjustedTime.toFixed(3)}s`;
+                }
+
+                console.log('Highlighting:', {
+                    word: timing.word,
+                    index: i,
+                    adjustedTime,
+                    range: `${start}-${end}`,
+                    speed: this.playbackSpeed
+                });
+                break;
+            }
+        }
+
+        if (!foundWord && this.debugWord) {
+            this.debugWord.textContent = 'none';
+        }
+
+        // Schedule next update
+        this.animationFrameId = requestAnimationFrame(() => this.updateHighlighting());
     }
 }
