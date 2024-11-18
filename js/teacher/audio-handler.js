@@ -11,6 +11,15 @@ export class AudioHandler {
         this.microphone = null;
         this.myvad = null;
         this.vadInitialized = false;
+
+        // Map language codes to voice IDs
+        this.voiceMap = {
+            'en': 'EN',
+            'es': 'ES',
+            'fr': 'FR',
+            'zh': 'ZH',
+            'ja': 'JA'
+        };
     }
 
     async initVAD() {
@@ -119,11 +128,19 @@ export class AudioHandler {
         const base64Audio = btoa(String.fromCharCode(...new Uint8Array(audioData.buffer)));
         
         try {
+            // Get the correct voice ID for the target language
+            const voiceId = this.voiceMap[this.toLanguage];
+            if (!voiceId) {
+                throw new Error(`No voice mapping found for language: ${this.toLanguage}`);
+            }
+
+            console.log(`Processing audio: from ${this.fromLanguage} to ${this.toLanguage} using voice ${voiceId}`);
+
             const response = await API.processAudio(
                 base64Audio,
                 this.fromLanguage,
                 this.toLanguage,
-                this.toLanguage.toUpperCase()
+                voiceId
             );
 
             if (response.success) {
@@ -162,6 +179,7 @@ export class AudioHandler {
     }
 
     setLanguages(fromLang, toLang) {
+        console.log(`Setting languages: ${fromLang} -> ${toLang}`);
         this.fromLanguage = fromLang;
         this.toLanguage = toLang;
     }

@@ -61,6 +61,10 @@ class TeacherApp {
         
         // Language selection
         this.fromLanguage.addEventListener('change', () => this.updateToLanguages());
+        this.toLanguage.addEventListener('change', () => {
+            // Update audio handler when target language changes
+            this.audioHandler.setLanguages(this.fromLanguage.value, this.toLanguage.value);
+        });
         
         // Dark mode
         DarkMode.init(this.darkModeToggle);

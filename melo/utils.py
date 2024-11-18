@@ -18,7 +18,6 @@ MATPLOTLIB_FLAG = False
 logger = logging.getLogger(__name__)
 
 
-
 def get_text_for_tts_infer(text, language_str, hps, device, symbol_to_id=None):
     norm_text, phone, tone, word2ph = clean_text(text, language_str)
     phone, tone, language = cleaned_text_to_sequence(phone, tone, language_str, symbol_to_id)
@@ -48,9 +47,7 @@ def get_text_for_tts_infer(text, language_str, hps, device, symbol_to_id=None):
         else:
             raise NotImplementedError()
 
-    assert bert.shape[-1] == len(
-        phone
-    ), f"Bert seq len {bert.shape[-1]} != {len(phone)}"
+    assert bert.shape[-1] == len(phone), f"Bert seq len {bert.shape[-1]} != {len(phone)}"
 
     phone = torch.LongTensor(phone)
     tone = torch.LongTensor(tone)
@@ -69,7 +66,6 @@ def load_checkpoint(checkpoint_path, model, optimizer=None, skip_optimizer=False
     ):
         optimizer.load_state_dict(checkpoint_dict["optimizer"])
     elif optimizer is None and not skip_optimizer:
-        # else:      Disable this line if Infer and resume checkpoint,then enable the line upper
         new_opt_dict = optimizer.state_dict()
         new_opt_dict_params = new_opt_dict["param_groups"][0]["params"]
         new_opt_dict["param_groups"] = checkpoint_dict["optimizer"]["param_groups"]
@@ -85,7 +81,6 @@ def load_checkpoint(checkpoint_path, model, optimizer=None, skip_optimizer=False
     new_state_dict = {}
     for k, v in state_dict.items():
         try:
-            # assert "emb_g" not in k
             new_state_dict[k] = saved_state_dict[k]
             assert saved_state_dict[k].shape == v.shape, (
                 saved_state_dict[k].shape,
@@ -93,7 +88,6 @@ def load_checkpoint(checkpoint_path, model, optimizer=None, skip_optimizer=False
             )
         except Exception as e:
             print(e)
-            # For upgrading from the old version
             if "ja_bert_proj" in k:
                 v = torch.zeros_like(v)
                 logger.warn(
@@ -110,7 +104,7 @@ def load_checkpoint(checkpoint_path, model, optimizer=None, skip_optimizer=False
         model.load_state_dict(new_state_dict, strict=False)
 
     logger.info(
-        "Loaded checkpoint '{}' (iteration {})".format(checkpoint_path, iteration)
+        f"Loaded checkpoint '{checkpoint_path}' (iteration {iteration})"
     )
 
     return model, optimizer, learning_rate, iteration
@@ -118,9 +112,7 @@ def load_checkpoint(checkpoint_path, model, optimizer=None, skip_optimizer=False
 
 def save_checkpoint(model, optimizer, learning_rate, iteration, checkpoint_path):
     logger.info(
-        "Saving model and optimizer state at iteration {} to {}".format(
-            iteration, checkpoint_path
-        )
+        f"Saving model and optimizer state at iteration {iteration} to {checkpoint_path}"
     )
     if hasattr(model, "module"):
         state_dict = model.module.state_dict()
@@ -167,12 +159,11 @@ def plot_spectrogram_to_numpy(spectrogram):
     global MATPLOTLIB_FLAG
     if not MATPLOTLIB_FLAG:
         import matplotlib
-
         matplotlib.use("Agg")
         MATPLOTLIB_FLAG = True
         mpl_logger = logging.getLogger("matplotlib")
         mpl_logger.setLevel(logging.WARNING)
-    import matplotlib.pylab as plt
+    import matplotlib.pyplot as plt
     import numpy as np
 
     fig, ax = plt.subplots(figsize=(10, 2))
@@ -183,7 +174,7 @@ def plot_spectrogram_to_numpy(spectrogram):
     plt.tight_layout()
 
     fig.canvas.draw()
-    data = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8, sep="")
+    data = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
     data = data.reshape(fig.canvas.get_width_height()[::-1] + (3,))
     plt.close()
     return data
@@ -193,12 +184,11 @@ def plot_alignment_to_numpy(alignment, info=None):
     global MATPLOTLIB_FLAG
     if not MATPLOTLIB_FLAG:
         import matplotlib
-
         matplotlib.use("Agg")
         MATPLOTLIB_FLAG = True
         mpl_logger = logging.getLogger("matplotlib")
         mpl_logger.setLevel(logging.WARNING)
-    import matplotlib.pylab as plt
+    import matplotlib.pyplot as plt
     import numpy as np
 
     fig, ax = plt.subplots(figsize=(6, 4))
@@ -214,7 +204,7 @@ def plot_alignment_to_numpy(alignment, info=None):
     plt.tight_layout()
 
     fig.canvas.draw()
-    data = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8, sep="")
+    data = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
     data = data.reshape(fig.canvas.get_width_height()[::-1] + (3,))
     plt.close()
     return data
@@ -229,6 +219,7 @@ def load_wav_to_torch_new(full_path):
     audio_norm, sampling_rate = torchaudio.load(full_path, frame_offset=0, num_frames=-1, normalize=True, channels_first=True)
     audio_norm = audio_norm.mean(dim=0)
     return audio_norm, sampling_rate
+
 
 def load_wav_to_torch_librosa(full_path, sr):
     audio_norm, sampling_rate = librosa.load(full_path, sr=sr, mono=True)
@@ -356,9 +347,7 @@ def check_git_hash(model_dir):
     source_dir = os.path.dirname(os.path.realpath(__file__))
     if not os.path.exists(os.path.join(source_dir, ".git")):
         logger.warn(
-            "{} is not a git repository, therefore hash value comparison will be ignored.".format(
-                source_dir
-            )
+            f"{source_dir} is not a git repository, therefore hash value comparison will be ignored."
         )
         return
 
@@ -369,9 +358,7 @@ def check_git_hash(model_dir):
         saved_hash = open(path).read()
         if saved_hash != cur_hash:
             logger.warn(
-                "git hash values are different. {}(saved) != {}(current)".format(
-                    saved_hash[:8], cur_hash[:8]
-                )
+                f"git hash values are different. {saved_hash[:8]}(saved) != {cur_hash[:8]}(current)"
             )
     else:
         open(path, "w").write(cur_hash)
@@ -395,7 +382,7 @@ def get_logger(model_dir, filename="train.log"):
 class HParams:
     def __init__(self, **kwargs):
         for k, v in kwargs.items():
-            if type(v) == dict:
+            if isinstance(v, dict):
                 v = HParams(**v)
             self[k] = v
 

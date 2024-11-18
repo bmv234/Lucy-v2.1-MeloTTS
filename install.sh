@@ -46,13 +46,13 @@ eval "$(pyenv init -)"
 
 cd '"'$PWD'"'
 
-# Install Python 3.10 if needed
-if ! pyenv versions | grep -q "3.10"; then
-    pyenv install 3.10
+# Install Python 3.12 if needed
+if ! pyenv versions | grep -q "3.12"; then
+    pyenv install 3.12
 fi
 
 # Set local Python version
-pyenv local 3.10
+pyenv local 3.12
 
 # Install/Update Rust
 if ! command -v rustup &> /dev/null; then
@@ -78,41 +78,42 @@ python -m pip install --upgrade maturin
 RUSTUP_TOOLCHAIN=stable pip install --no-binary :all: tokenizers
 pip install torch numpy
 
-# Remove existing MeloTTS directory if it exists
-rm -rf MeloTTS
-
-# Clone MeloTTS
-git clone https://github.com/myshell-ai/MeloTTS.git
-cd MeloTTS
-
-# Build and install MeloTTS
-pip install .
-cd ..
+# Build and install local MeloTTS package
+python setup.py build
+pip install -e .
 
 # Install remaining requirements
 pip install -r requirements.txt
 
 # Create test script
-cat > test_melotts.py << EOL
+cat > test_melo.py << EOL
 #!/usr/bin/env python3
 import os
 import sys
 
 try:
-    from melotts import MeloTTS
+    from melo import TTS
     print("MeloTTS import successful")
+    tts = TTS(language="EN")
+    print("MeloTTS initialization successful")
     sys.exit(0)
 except Exception as e:
-    print(f"Error importing MeloTTS: {e}")
+    print(f"Error testing MeloTTS: {e}")
     sys.exit(1)
 EOL
 
 # Make test script executable
-chmod +x test_melotts.py
+chmod +x test_melo.py
 
 # Run test script
-./test_melotts.py
-rm test_melotts.py
+./test_melo.py
+
+# Clean up test script
+rm -f test_melo.py
+
+# Clean up build artifacts
+echo "Cleaning up build artifacts..."
+rm -rf build/ dist/ *.egg-info/
 '
 
 # Run installation commands as the actual user

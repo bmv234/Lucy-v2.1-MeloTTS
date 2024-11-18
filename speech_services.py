@@ -11,6 +11,14 @@ import os
 from config import WHISPER_MODEL_ID, SUPPORTED_LANGUAGES, logger
 from utils import get_device, adjust_speed_for_model, log_error
 
+# Define supported translation pairs based on testing results
+SUPPORTED_TRANSLATION_PAIRS = [
+    ('zh', 'en'), ('en', 'zh'),
+    ('en', 'fr'), ('fr', 'en'),
+    ('en', 'ja'), ('ja', 'en'),
+    ('en', 'es'), ('es', 'en')
+]
+
 class SpeechServices:
     def __init__(self):
         self.device = get_device()
@@ -47,24 +55,35 @@ class SpeechServices:
     def _init_translation(self) -> None:
         """Initialize translation packages."""
         try:
+            # Clear existing packages
+            package_dir = os.path.expanduser('~/.local/share/argos-translate/packages')
+            if os.path.exists(package_dir):
+                import shutil
+                shutil.rmtree(package_dir)
+
+            # Update package index and get available packages
             argostranslate.package.update_package_index()
             available_packages = argostranslate.package.get_available_packages()
+            
+            # Install packages for supported translation pairs
+            installed_pairs = set()
+            for package in available_packages:
+                pair = (package.from_code, package.to_code)
+                if pair in SUPPORTED_TRANSLATION_PAIRS:
+                    logger.info(f"Installing language package: {package.from_code} to {package.to_code}")
+                    argostranslate.package.install_from_path(package.download())
+                    installed_pairs.add(pair)
+            
+            # Verify all supported pairs are installed
+            missing_pairs = set(SUPPORTED_TRANSLATION_PAIRS) - installed_pairs
+            if missing_pairs:
+                logger.warning(f"Some supported translation pairs could not be installed: {missing_pairs}")
+            
+            # Log installed packages
             installed_packages = argostranslate.package.get_installed_packages()
-            
-            # Install missing language pairs
-            language_pairs = [(from_code, to_code) 
-                            for from_code in SUPPORTED_LANGUAGES.keys() 
-                            for to_code in SUPPORTED_LANGUAGES.keys() 
-                            if from_code != to_code]
-            
-            for from_code, to_code in language_pairs:
-                if not any(pkg.from_code == from_code and pkg.to_code == to_code 
-                          for pkg in installed_packages):
-                    package = next((pkg for pkg in available_packages 
-                                  if pkg.from_code == from_code and pkg.to_code == to_code), None)
-                    if package:
-                        logger.info(f"Installing language package: {from_code} to {to_code}")
-                        argostranslate.package.install_from_path(package.download())
+            logger.info("Installed translation packages:")
+            for pkg in installed_packages:
+                logger.info(f"- {pkg.from_code} -> {pkg.to_code}")
             
             logger.info("Translation packages initialized successfully")
         except Exception as e:
@@ -74,6 +93,9 @@ class SpeechServices:
     def transcribe(self, audio: np.ndarray, from_language: str) -> str:
         """Transcribe audio to text using Whisper."""
         try:
+            if from_language not in SUPPORTED_LANGUAGES:
+                raise ValueError(f"Unsupported language for transcription: {from_language}")
+
             input_features = self.processor(
                 audio, 
                 sampling_rate=16000, 
@@ -106,9 +128,17 @@ class SpeechServices:
             return text
             
         try:
+            # Validate language pair is supported
+            if (from_code, to_code) not in SUPPORTED_TRANSLATION_PAIRS:
+                raise ValueError(
+                    f"Unsupported translation pair: {from_code} -> {to_code}. "
+                    f"Available pairs: {self.get_language_pairs()}"
+                )
+            
+            # Use argostranslate for translation
             translated = argostranslate.translate.translate(text, from_code, to_code)
-            if translated is None or translated == text:
-                raise ValueError(f"Translation failed or returned None for {from_code} to {to_code}")
+            if translated is None or translated.strip() == "":
+                raise ValueError(f"Translation failed or returned empty for {from_code} to {to_code}")
             return translated
         except Exception as e:
             log_error(e, f"Translation failed ({from_code} to {to_code})")
@@ -128,13 +158,18 @@ class SpeechServices:
                 'ES': 'es',
                 'FR': 'fr',
                 'ZH': 'zh',
-                'JP': 'ja'
+                'JA': 'ja',  # Changed from JP to JA to match frontend
+                'JP': 'ja'   # Keep JP mapping for backward compatibility
             }
             
             language = lang_map.get(voice_id, 'en')
             
+            # Validate language is supported
+            if language not in self.tts_models:
+                raise ValueError(f"Unsupported language for speech synthesis: {language}")
+            
             # Get the appropriate TTS model
-            tts = self.tts_models.get(language, self.tts_models['en'])
+            tts = self.tts_models[language]
             
             # Generate speech
             tts.tts_to_file(text, speaker_id=0, output_path=temp_path)
@@ -163,13 +198,14 @@ class SpeechServices:
             {"id": "ES", "name": "Spanish"},
             {"id": "FR", "name": "French"},
             {"id": "ZH", "name": "Chinese"},
-            {"id": "JP", "name": "Japanese"}
+            {"id": "JA", "name": "Japanese"}  # Changed from JP to JA to match frontend
         ]
 
     def get_language_pairs(self) -> Dict[str, List[str]]:
         """Get available language translation pairs."""
-        return {
-            lang: [pkg.to_code for pkg in argostranslate.package.get_installed_packages() 
-                  if pkg.from_code == lang and pkg.to_code in SUPPORTED_LANGUAGES]
-            for lang in SUPPORTED_LANGUAGES.keys()
-        }
+        pairs = {}
+        for from_code, to_code in SUPPORTED_TRANSLATION_PAIRS:
+            if from_code not in pairs:
+                pairs[from_code] = []
+            pairs[from_code].append(to_code)
+        return pairs

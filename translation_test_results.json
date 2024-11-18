@@ -1,0 +1,39 @@
+{
+  "total_pairs_found": 92,
+  "compatible_pairs": 8,
+  "successful_pairs": 8,
+  "pairs": [
+    {
+      "from_code": "zh",
+      "to_code": "en"
+    },
+    {
+      "from_code": "en",
+      "to_code": "zh"
+    },
+    {
+      "from_code": "en",
+      "to_code": "fr"
+    },
+    {
+      "from_code": "en",
+      "to_code": "ja"
+    },
+    {
+      "from_code": "en",
+      "to_code": "es"
+    },
+    {
+      "from_code": "fr",
+      "to_code": "en"
+    },
+    {
+      "from_code": "ja",
+      "to_code": "en"
+    },
+    {
+      "from_code": "es",
+      "to_code": "en"
+    }
+  ]
+}

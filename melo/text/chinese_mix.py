@@ -32,10 +32,10 @@ rep_map = {
     "、": ",",
     "...": "…",
     "$": ".",
-    """: "'",
-    """: "'",
-    "'": "'",
-    "'": "'",
+    "“": "'",
+    "”": "'",
+    "‘": "'",
+    "’": "'",
     "（": "'",
     "）": "'",
     "(": "'",
@@ -209,13 +209,13 @@ def _g2p_v2(segments):
     for text in segments:
         assert spliter not in text
         # replace all english words
-        text = re.sub(r'([a-zA-Z\s]+)', lambda x: f'{spliter}{x.group(1)}{spliter}', text)
+        text = re.sub('([a-zA-Z\s]+)', lambda x: f'{spliter}{x.group(1)}{spliter}', text)
         texts = text.split(spliter)
         texts = [t for t in texts if len(t) > 0]
 
         
         for text in texts:
-            if re.match(r'[a-zA-Z\s]+', text):
+            if re.match('[a-zA-Z\s]+', text):
                 # english
                 tokenized_en = tokenizer.tokenize(text)
                 phones_en, tones_en, word2ph_en = g2p_en(text=None, pad_start_end=False, tokenized=tokenized_en)
@@ -246,3 +246,8 @@ if __name__ == "__main__":
     bert = get_bert_feature(text, word2ph, device='cuda:0')
     print(phones)
     import pdb; pdb.set_trace()
+
+
+# # 示例用法
+# text = "这是一个示例文本：,你好！这是一个测试...."
+# print(g2p_paddle(text))  # 输出: 这是一个示例文本你好这是一个测试

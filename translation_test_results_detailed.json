@@ -1,0 +1,58 @@
+[
+  {
+    "from_lang": "zh",
+    "to_lang": "en",
+    "original": "你好，你好吗？",
+    "translated": "Hello. How are you?",
+    "success": true
+  },
+  {
+    "from_lang": "en",
+    "to_lang": "zh",
+    "original": "Hello, how are you?",
+    "translated": "你好,你好吗?",
+    "success": true
+  },
+  {
+    "from_lang": "en",
+    "to_lang": "fr",
+    "original": "Hello, how are you?",
+    "translated": "Bonjour, ça va ?",
+    "success": true
+  },
+  {
+    "from_lang": "en",
+    "to_lang": "ja",
+    "original": "Hello, how are you?",
+    "translated": "お問い合わせ",
+    "success": true
+  },
+  {
+    "from_lang": "en",
+    "to_lang": "es",
+    "original": "Hello, how are you?",
+    "translated": "Hola, ¿cómo estás?",
+    "success": true
+  },
+  {
+    "from_lang": "fr",
+    "to_lang": "en",
+    "original": "Bonjour, comment allez-vous?",
+    "translated": "Hello, how are you?",
+    "success": true
+  },
+  {
+    "from_lang": "ja",
+    "to_lang": "en",
+    "original": "こんにちは、お元気ですか？",
+    "translated": "Hello!",
+    "success": true
+  },
+  {
+    "from_lang": "es",
+    "to_lang": "en",
+    "original": "¿Hola, cómo estás?",
+    "translated": "Hello, how are you?",
+    "success": true
+  }
+]
