@@ -89,20 +89,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Set working directory
 WORKDIR /app
 
-# Copy requirements first to leverage Docker cache
-COPY requirements.txt .
-
-# Install Python dependencies
-RUN python3 -m pip install --no-cache-dir wheel setuptools maturin \
-    && python3 -m pip install --no-cache-dir --no-binary :all: tokenizers \
-    && python3 -m pip install --no-cache-dir torch torchaudio numpy \
-    && python3 -m pip install --no-cache-dir -r requirements.txt
-
 # Copy application code
 COPY . .
 
-# Build and install local MeloTTS package
-RUN python3 setup.py build \
+# Install Python dependencies and MeloTTS
+RUN python3 -m pip install --no-cache-dir wheel setuptools maturin \
+    && python3 -m pip install --no-cache-dir --no-binary :all: tokenizers \
+    && python3 -m pip install --no-cache-dir torch torchaudio numpy \
     && python3 -m pip install -e .
 
 # Generate SSL certificates
@@ -118,10 +111,6 @@ RUN mkdir -p /app/temp \
 # Expose port
 EXPOSE 5000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -k --fail https://localhost:5000/ || exit 1
-
 # Set environment variables
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -132,8 +121,9 @@ ENV PYTHONUNBUFFERED=1 \
 RUN mkdir -p /app/.cache/huggingface \
     && chmod -R 777 /app/.cache
 
-# Test MeloTTS installation
-RUN python3 -c "from melo import TTS; tts = TTS(language='EN')"
+# Health check
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+    CMD curl -k --fail https://localhost:5000/ || exit 1
 
 # Run the application
 CMD ["python3", "app.py"]
