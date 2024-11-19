@@ -6,12 +6,6 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-# Check if nvidia-docker is installed
-if ! command -v nvidia-docker &> /dev/null && ! docker info | grep -q "Runtimes:.*nvidia"; then
-    echo -e "${RED}Error: NVIDIA Docker runtime is not installed. Please install nvidia-docker2.${NC}"
-    exit 1
-fi
-
 # Stop and remove existing container if it exists
 if [ "$(docker ps -aq -f name=lucy-melotts)" ]; then
     echo -e "${YELLOW}Stopping and removing existing container...${NC}"
@@ -28,7 +22,6 @@ fi
 echo -e "${YELLOW}Starting Lucy MeloTTS container...${NC}"
 if ! docker run -d \
     --name lucy-melotts \
-    --gpus all \
     -p 5000:5000 \
     -v "$(pwd)/temp:/app/temp" \
     -v "$(pwd)/.cache:/app/.cache" \

@@ -1,9 +1,8 @@
-# Use NVIDIA CUDA as base image for GPU support
-FROM nvidia/cuda:12.6.1-cudnn-devel-ubuntu24.04 AS builder
+# Use Python as base image
+FROM python:3.12-slim AS builder
 
 # Set environment variables
-ENV PYTHON_VERSION=3.12.0 \
-    PYTHONUNBUFFERED=1 \
+ENV PYTHONUNBUFFERED=1 \
     DEBIAN_FRONTEND=noninteractive \
     PATH="/root/.cargo/bin:${PATH}" \
     RUSTUP_HOME=/usr/local/rustup \
@@ -12,20 +11,12 @@ ENV PYTHON_VERSION=3.12.0 \
 # Install build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
-    zlib1g-dev \
-    libncurses5-dev \
-    libgdbm-dev \
-    libnss3-dev \
+    pkg-config \
     libssl-dev \
-    libreadline-dev \
     libffi-dev \
-    libsqlite3-dev \
-    libbz2-dev \
-    wget \
+    python3-dev \
     git \
     curl \
-    pkg-config \
-    python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Rust toolchain
@@ -34,27 +25,10 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
     && rustup update \
     && rustup default stable
 
-# Build Python from source
-RUN wget https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tgz \
-    && tar xzf Python-${PYTHON_VERSION}.tgz \
-    && cd Python-${PYTHON_VERSION} \
-    && ./configure --enable-optimizations \
-    && make -j$(nproc) \
-    && make install \
-    && cd .. \
-    && rm -rf Python-${PYTHON_VERSION}* \
-    && python3 -m ensurepip \
-    && python3 -m pip install --no-cache-dir --upgrade pip wheel setuptools
-
-# Set Python 3.12 as default
-RUN update-alternatives --install /usr/bin/python python /usr/local/bin/python3 1 \
-    && update-alternatives --install /usr/bin/python3 python3 /usr/local/bin/python3 1
-
 # Create final image
-FROM nvidia/cuda:12.6.1-cudnn-runtime-ubuntu24.04
+FROM python:3.12-slim
 
-# Copy Python and Rust installations from builder
-COPY --from=builder /usr/local /usr/local
+# Copy Rust installations from builder
 COPY --from=builder /usr/local/rustup /usr/local/rustup
 COPY --from=builder /usr/local/cargo /usr/local/cargo
 
@@ -65,7 +39,6 @@ ENV PATH="/usr/local/cargo/bin:${PATH}" \
 
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libsqlite3-0 \
     libssl3 \
     openssl \
     git \
