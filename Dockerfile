@@ -1,8 +1,8 @@
 # Use NVIDIA CUDA as base image for GPU support
-FROM nvidia/cuda:12.6.1-cudnn-devel-ubuntu24.04 as builder
+FROM nvidia/cuda:12.6.1-cudnn-devel-ubuntu24.04 AS builder
 
 # Set environment variables
-ENV PYTHON_VERSION=3.10.12 \
+ENV PYTHON_VERSION=3.12.0 \
     PYTHONUNBUFFERED=1 \
     DEBIAN_FRONTEND=noninteractive \
     PATH="/root/.cargo/bin:${PATH}" \
@@ -46,7 +46,7 @@ RUN wget https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VER
     && python3 -m ensurepip \
     && python3 -m pip install --no-cache-dir --upgrade pip wheel setuptools
 
-# Set Python 3.10 as default
+# Set Python 3.12 as default
 RUN update-alternatives --install /usr/bin/python python /usr/local/bin/python3 1 \
     && update-alternatives --install /usr/bin/python3 python3 /usr/local/bin/python3 1
 
@@ -74,6 +74,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     python3-dev \
     libffi-dev \
+    mecab \
+    mecab-ipadic \
+    libmecab-dev \
+    swig \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install additional audio processing dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libsndfile1 \
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
@@ -83,19 +93,17 @@ WORKDIR /app
 COPY requirements.txt .
 
 # Install Python dependencies
-RUN python3 -m pip install --no-cache-dir wheel setuptools \
+RUN python3 -m pip install --no-cache-dir wheel setuptools maturin \
     && python3 -m pip install --no-cache-dir --no-binary :all: tokenizers \
-    && python3 -m pip install --no-cache-dir torch numpy \
+    && python3 -m pip install --no-cache-dir torch torchaudio numpy \
     && python3 -m pip install --no-cache-dir -r requirements.txt
-
-# Install additional audio processing dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libsndfile1 \
-    ffmpeg \
-    && rm -rf /var/lib/apt/lists/*
 
 # Copy application code
 COPY . .
+
+# Build and install local MeloTTS package
+RUN python3 setup.py build \
+    && python3 -m pip install -e .
 
 # Generate SSL certificates
 RUN openssl req -x509 -newkey rsa:2048 \
@@ -123,6 +131,9 @@ ENV PYTHONUNBUFFERED=1 \
 # Create and set permissions for cache directories
 RUN mkdir -p /app/.cache/huggingface \
     && chmod -R 777 /app/.cache
+
+# Test MeloTTS installation
+RUN python3 -c "from melo import TTS; tts = TTS(language='EN')"
 
 # Run the application
 CMD ["python3", "app.py"]
